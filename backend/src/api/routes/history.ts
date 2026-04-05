@@ -1,0 +1,39 @@
+import { Router } from "express";
+
+import type { HistoryResponse } from "../../types/api";
+import type { HistoryService } from "../../services/history-service";
+
+function parseUnixSeconds(value: unknown): number | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
+export function createHistoryRouter(historyService: HistoryService): Router {
+  const router = Router();
+
+  router.get("/api/v1/history", (request, response) => {
+    const from = parseUnixSeconds(request.query.from);
+    const to = parseUnixSeconds(request.query.to);
+
+    if (from === null || to === null || from > to) {
+      response.status(400).json({
+        error: "Invalid query. Expected from and to in unix seconds."
+      });
+      return;
+    }
+
+    const payload: HistoryResponse = {
+      from,
+      to,
+      samples: historyService.getHistory(from, to)
+    };
+
+    response.json(payload);
+  });
+
+  return router;
+}

@@ -4,7 +4,7 @@
 
 - Node.js LTS instalado localmente
 - Comando `ping` disponible en el sistema operativo
-- Acceso a una gateway local y salida de red hacia el destino configurado
+- Salida de red hacia el destino configurado
 
 ## Configuración inicial
 
@@ -20,11 +20,8 @@ npm install
 MONITOR_TARGET=1.1.1.1
 MONITOR_INTERVAL_SECONDS=5
 MONITOR_RETENTION_DAYS=30
-MONITOR_GATEWAY_IP=
 PORT=4173
 ```
-
-`MONITOR_GATEWAY_IP` puede quedar vacío para permitir detección automática.
 
 ## Desarrollo
 
@@ -34,12 +31,12 @@ PORT=4173
 npm run dev
 ```
 
-2. Abrir la interfaz local Vite en el puerto configurado para frontend.
+2. Abrir la interfaz local Vite en `http://127.0.0.1:5173`.
 
 3. Verificar datos iniciales:
 
 ```bash
-curl http://127.0.0.1:4173/api/v1/bootstrap?range=24h&bucket=300
+curl http://127.0.0.1:4173/api/v1/bootstrap?range=24h
 ```
 
 4. Verificar streaming SSE:
@@ -68,9 +65,8 @@ npm run start
 
 1. Confirmar que `/health` responde `{"ok":true,...}`.
 2. Confirmar que `/api/v1/bootstrap` devuelve `current` e `history`.
-3. Desconectar temporalmente la salida a internet manteniendo la LAN y verificar
-   transición a `global_down`.
-4. Desconectar la red local o bloquear la gateway y verificar transición a
-   `local_down`.
+3. Desconectar temporalmente la salida a internet y verificar transición a
+   `down`.
+4. Volver a conectar y verificar recuperación automática a `ok`.
 5. Esperar más de una hora o forzar la tarea de purga y comprobar que no quedan
    registros más viejos que la retención configurada.

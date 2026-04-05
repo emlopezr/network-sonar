@@ -30,11 +30,11 @@ implementation and testing of each story.
 
 **Purpose**: Project initialization and shared workspace structure
 
-- [ ] T001 Create the root workspace manifests in `package.json`, `tsconfig.base.json`, and `eslint.config.js`
-- [ ] T002 [P] Create backend package scaffolding in `backend/package.json`, `backend/tsconfig.json`, and `backend/src/server.ts`
-- [ ] T003 [P] Create frontend package scaffolding in `frontend/package.json`, `frontend/tsconfig.json`, `frontend/index.html`, and `frontend/src/main.tsx`
-- [ ] T004 [P] Create test runner scaffolding in `tests/contract/.gitkeep`, `tests/integration/.gitkeep`, and `tests/unit/.gitkeep`
-- [ ] T005 Configure root scripts for `dev`, `build`, `start`, `lint`, and `typecheck` in `package.json`
+- [X] T001 Create the root workspace manifests in `package.json`, `tsconfig.base.json`, and `eslint.config.js`
+- [X] T002 [P] Create backend package scaffolding in `backend/package.json`, `backend/tsconfig.json`, and `backend/src/server.ts`
+- [X] T003 [P] Create frontend package scaffolding in `frontend/package.json`, `frontend/tsconfig.json`, `frontend/index.html`, and `frontend/src/main.tsx`
+- [X] T004 [P] Create test runner scaffolding in `tests/contract/.gitkeep`, `tests/integration/.gitkeep`, and `tests/unit/.gitkeep`
+- [X] T005 Configure root scripts for `dev`, `build`, `start`, `lint`, and `typecheck` in `package.json`
 
 ---
 
@@ -45,16 +45,16 @@ be implemented
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T006 Define shared monitor, storage, and API interfaces in `backend/src/types/monitor.ts`, `backend/src/types/storage.ts`, `backend/src/types/api.ts`, and `frontend/src/types/monitor.ts`
-- [ ] T007 Implement SQLite bootstrap and migration loading in `backend/src/data/db.ts` and `backend/src/data/migrations/001_init.sql`
-- [ ] T008 Implement the connection log repository and purge service in `backend/src/data/connection-log-repository.ts` and `backend/src/data/purge-service.ts`
-- [ ] T009 [P] Implement environment and runtime configuration loading in `backend/src/config.ts` and `backend/src/types/env.d.ts`
-- [ ] T010 [P] Implement the typed event bus and shared monitor orchestration service in `backend/src/services/event-bus.ts` and `backend/src/services/monitor-service.ts`
-- [ ] T011 [P] Implement the OS gateway resolution adapter in `backend/src/network/gateway-resolver.ts`
-- [ ] T012 [P] Implement the ping command adapter using `node:child_process` in `backend/src/network/ping-command.ts`
-- [ ] T013 Implement the worker-thread execution boundary in `backend/src/network/monitor-worker.ts` and `backend/src/network/worker-entry.ts`
-- [ ] T014 Implement the 5-second scheduler, timeout policy, and hourly purge trigger in `backend/src/network/monitor-scheduler.ts`
-- [ ] T015 Implement the Express app shell, health route, and production static serving in `backend/src/app.ts`, `backend/src/api/routes/health.ts`, and `backend/src/server.ts`
+- [X] T006 Define shared monitor, storage, and API interfaces in `backend/src/types/monitor.ts`, `backend/src/types/storage.ts`, `backend/src/types/api.ts`, and `frontend/src/types/monitor.ts`
+- [X] T007 Implement SQLite bootstrap and migration loading in `backend/src/data/db.ts` and `backend/src/data/migrations/001_init.sql`
+- [X] T008 Implement the connection log repository and purge service in `backend/src/data/connection-log-repository.ts` and `backend/src/data/purge-service.ts`
+- [X] T009 [P] Implement environment and runtime configuration loading in `backend/src/config.ts` and `backend/src/types/env.d.ts`
+- [X] T010 [P] Implement the typed event bus and shared monitor orchestration service in `backend/src/services/event-bus.ts` and `backend/src/services/monitor-service.ts`
+- [X] T011 [P] Implement the OS gateway resolution adapter in `backend/src/network/gateway-resolver.ts`
+- [X] T012 [P] Implement the ping command adapter using `node:child_process` in `backend/src/network/ping-command.ts`
+- [X] T013 Implement the worker-thread execution boundary in `backend/src/network/monitor-worker.ts` and `backend/src/network/worker-entry.ts`
+- [X] T014 Implement the 5-second scheduler, timeout policy, and hourly purge trigger in `backend/src/network/monitor-scheduler.ts`
+- [X] T015 Implement the Express app shell, health route, and production static serving in `backend/src/app.ts`, `backend/src/api/routes/health.ts`, and `backend/src/server.ts`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in
 parallel
@@ -74,20 +74,20 @@ cuando la conectividad pasa entre `ok`, `global_down` y `local_down`.
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T016 [P] [US1] Add bootstrap API contract test for `GET /api/v1/bootstrap` in `tests/contract/bootstrap.contract.test.ts`
-- [ ] T017 [P] [US1] Add SSE contract test for `GET /api/v1/events` in `tests/contract/events.contract.test.ts`
-- [ ] T018 [P] [US1] Add integration test for live status transitions in `tests/integration/live-status.integration.test.ts`
+- [X] T016 [P] [US1] Add bootstrap API contract test for `GET /api/v1/bootstrap` in `tests/contract/bootstrap.contract.test.ts`
+- [X] T017 [P] [US1] Add SSE contract test for `GET /api/v1/events` in `tests/contract/events.contract.test.ts`
+- [X] T018 [P] [US1] Add integration test for live status transitions in `tests/integration/live-status.integration.test.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T019 [P] [US1] Implement current snapshot derivation and staleness rules in `backend/src/services/current-status-service.ts`
-- [ ] T020 [US1] Implement the bootstrap route in `backend/src/api/routes/bootstrap.ts`
-- [ ] T021 [US1] Implement the SSE stream endpoint with `snapshot` and `heartbeat` events in `backend/src/api/sse/status-stream.ts`
-- [ ] T022 [US1] Wire monitor events into the Express app in `backend/src/app.ts`
-- [ ] T023 [P] [US1] Implement the frontend bootstrap client and EventSource adapter in `frontend/src/services/api-client.ts` and `frontend/src/services/status-stream.ts`
-- [ ] T024 [P] [US1] Implement current status UI components in `frontend/src/components/status-card.tsx` and `frontend/src/components/connection-badge.tsx`
-- [ ] T025 [US1] Compose the live dashboard page in `frontend/src/pages/dashboard.tsx` and `frontend/src/app.tsx`
-- [ ] T026 [US1] Add frontend stale-state and stream-reconnect handling in `frontend/src/pages/dashboard.tsx`
+- [X] T019 [P] [US1] Implement current snapshot derivation and staleness rules in `backend/src/services/current-status-service.ts`
+- [X] T020 [US1] Implement the bootstrap route in `backend/src/api/routes/bootstrap.ts`
+- [X] T021 [US1] Implement the SSE stream endpoint with `snapshot` and `heartbeat` events in `backend/src/api/sse/status-stream.ts`
+- [X] T022 [US1] Wire monitor events into the Express app in `backend/src/app.ts`
+- [X] T023 [P] [US1] Implement the frontend bootstrap client and EventSource adapter in `frontend/src/services/api-client.ts` and `frontend/src/services/status-stream.ts`
+- [X] T024 [P] [US1] Implement current status UI components in `frontend/src/components/status-card.tsx` and `frontend/src/components/connection-badge.tsx`
+- [X] T025 [US1] Compose the live dashboard page in `frontend/src/pages/dashboard.tsx` and `frontend/src/app.tsx`
+- [X] T026 [US1] Add frontend stale-state and stream-reconnect handling in `frontend/src/pages/dashboard.tsx`
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and
 testable independently
@@ -105,17 +105,17 @@ snapshot y payload SSE correctos.
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Add unit tests for classification logic in `tests/unit/monitor-classification.test.ts`
-- [ ] T028 [P] [US2] Add integration test for external-vs-local outage persistence in `tests/integration/outage-classification.integration.test.ts`
+- [X] T027 [P] [US2] Add unit tests for classification logic in `tests/unit/monitor-classification.test.ts`
+- [X] T028 [P] [US2] Add integration test for external-vs-local outage persistence in `tests/integration/outage-classification.integration.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T029 [P] [US2] Implement cycle classification and failure-reason mapping in `backend/src/services/monitor-cycle-service.ts`
-- [ ] T030 [US2] Persist gateway and latency diagnostics through `backend/src/data/connection-log-repository.ts`
-- [ ] T031 [US2] Update worker execution to run external ping first and conditional gateway ping second in `backend/src/network/monitor-worker.ts`
-- [ ] T032 [US2] Implement gateway fallback resolution and configuration override handling in `backend/src/network/gateway-resolver.ts`
-- [ ] T033 [US2] Emit `sample` SSE events with diagnostic fields in `backend/src/api/sse/status-stream.ts`
-- [ ] T034 [US2] Show provider-vs-local diagnosis text and last failure reason in `frontend/src/components/status-card.tsx` and `frontend/src/pages/dashboard.tsx`
+- [X] T029 [P] [US2] Implement cycle classification and failure-reason mapping in `backend/src/services/monitor-cycle-service.ts`
+- [X] T030 [US2] Persist gateway and latency diagnostics through `backend/src/data/connection-log-repository.ts`
+- [X] T031 [US2] Update worker execution to run external ping first and conditional gateway ping second in `backend/src/network/monitor-worker.ts`
+- [X] T032 [US2] Implement gateway fallback resolution and configuration override handling in `backend/src/network/gateway-resolver.ts`
+- [X] T033 [US2] Emit `sample` SSE events with diagnostic fields in `backend/src/api/sse/status-stream.ts`
+- [X] T034 [US2] Show provider-vs-local diagnosis text and last failure reason in `frontend/src/components/status-card.tsx` and `frontend/src/pages/dashboard.tsx`
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work
 independently
@@ -133,18 +133,18 @@ inicial y añade nuevas muestras sin recargar.
 
 ### Tests for User Story 3
 
-- [ ] T035 [P] [US3] Add history API contract test for `GET /api/v1/history` in `tests/contract/history.contract.test.ts`
-- [ ] T036 [P] [US3] Add integration test for history bucketing and retention window in `tests/integration/history-window.integration.test.ts`
-- [ ] T037 [P] [US3] Add UI integration test for timeline updates in `tests/integration/history-timeline.integration.test.ts`
+- [X] T035 [P] [US3] Add history API contract test for `GET /api/v1/history` in `tests/contract/history.contract.test.ts`
+- [X] T036 [P] [US3] Add integration test for history bucketing and retention window in `tests/integration/history-window.integration.test.ts`
+- [X] T037 [P] [US3] Add UI integration test for timeline updates in `tests/integration/history-timeline.integration.test.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T038 [P] [US3] Implement history bucket queries and range filtering in `backend/src/services/history-service.ts`
-- [ ] T039 [US3] Implement the history route in `backend/src/api/routes/history.ts`
-- [ ] T040 [US3] Emit `history-append` SSE events for new persisted samples in `backend/src/api/sse/status-stream.ts`
-- [ ] T041 [P] [US3] Implement the timeline heatmap and legend components in `frontend/src/components/timeline-heatmap.tsx` and `frontend/src/components/legend.tsx`
-- [ ] T042 [US3] Integrate historical range loading and incremental updates in `frontend/src/pages/dashboard.tsx`
-- [ ] T043 [US3] Add server-side bucket selection and history query parsing in `backend/src/api/routes/bootstrap.ts` and `backend/src/api/routes/history.ts`
+- [X] T038 [P] [US3] Implement history bucket queries and range filtering in `backend/src/services/history-service.ts`
+- [X] T039 [US3] Implement the history route in `backend/src/api/routes/history.ts`
+- [X] T040 [US3] Emit `history-append` SSE events for new persisted samples in `backend/src/api/sse/status-stream.ts`
+- [X] T041 [P] [US3] Implement the timeline heatmap and legend components in `frontend/src/components/timeline-heatmap.tsx` and `frontend/src/components/legend.tsx`
+- [X] T042 [US3] Integrate historical range loading and incremental updates in `frontend/src/pages/dashboard.tsx`
+- [X] T043 [US3] Add server-side bucket selection and history query parsing in `backend/src/api/routes/bootstrap.ts` and `backend/src/api/routes/history.ts`
 
 **Checkpoint**: All user stories should now be independently functional
 
@@ -154,11 +154,11 @@ inicial y añade nuevas muestras sin recargar.
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T044 [P] Add end-to-end smoke coverage for bootstrap, SSE, and history flows in `tests/integration/quickstart-smoke.integration.test.ts`
-- [ ] T045 Validate the 30-day retention purge and startup purge behavior in `tests/integration/purge-policy.integration.test.ts`
-- [ ] T046 [P] Finalize Vite production build and backend static asset serving in `frontend/vite.config.ts`, `backend/src/app.ts`, and `backend/package.json`
-- [ ] T047 [P] Document runtime configuration and local verification steps in `README.md` and `specs/001-local-network-monitor/quickstart.md`
-- [ ] T048 Run lint, typecheck, contract, integration, and build validation through `package.json` scripts and fix any remaining issues in `package.json`
+- [X] T044 [P] Add end-to-end smoke coverage for bootstrap, SSE, and history flows in `tests/integration/quickstart-smoke.integration.test.ts`
+- [X] T045 Validate the 30-day retention purge and startup purge behavior in `tests/integration/purge-policy.integration.test.ts`
+- [X] T046 [P] Finalize Vite production build and backend static asset serving in `frontend/vite.config.ts`, `backend/src/app.ts`, and `backend/package.json`
+- [X] T047 [P] Document runtime configuration and local verification steps in `README.md` and `specs/001-local-network-monitor/quickstart.md`
+- [X] T048 Run lint, typecheck, contract, integration, and build validation through `package.json` scripts and fix any remaining issues in `package.json`
 
 ---
 
