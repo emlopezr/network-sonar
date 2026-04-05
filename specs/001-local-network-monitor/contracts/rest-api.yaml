@@ -1,0 +1,213 @@
+openapi: 3.1.0
+info:
+  title: Network Sonar Local Monitor API
+  version: 1.0.0
+servers:
+  - url: http://127.0.0.1:4173
+paths:
+  /api/v1/bootstrap:
+    get:
+      summary: Return current monitor snapshot and initial history payload
+      parameters:
+        - in: query
+          name: range
+          schema:
+            type: string
+            enum: [1h, 6h, 24h, 7d, 30d]
+          required: false
+        - in: query
+          name: bucket
+          schema:
+            type: integer
+            enum: [5, 60, 300, 900, 3600]
+          required: false
+      responses:
+        '200':
+          description: Bootstrap payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BootstrapResponse'
+  /api/v1/history:
+    get:
+      summary: Return history series for a custom time range
+      parameters:
+        - in: query
+          name: from
+          schema:
+            type: integer
+            minimum: 0
+          required: true
+        - in: query
+          name: to
+          schema:
+            type: integer
+            minimum: 0
+          required: true
+        - in: query
+          name: bucket
+          schema:
+            type: integer
+            enum: [5, 60, 300, 900, 3600]
+          required: true
+      responses:
+        '200':
+          description: History payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoryResponse'
+  /api/v1/events:
+    get:
+      summary: Open a Server-Sent Events stream for live status updates
+      responses:
+        '200':
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  /health:
+    get:
+      summary: Local process health endpoint
+      responses:
+        '200':
+          description: Health payload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, now]
+                properties:
+                  ok:
+                    type: boolean
+                  now:
+                    type: integer
+
+components:
+  schemas:
+    MonitorSample:
+      type: object
+      required:
+        - observedAt
+        - status
+        - externalTarget
+        - externalOk
+      properties:
+        observedAt:
+          type: integer
+        status:
+          type: string
+          enum: [ok, global_down, local_down]
+        externalTarget:
+          type: string
+        gatewayIp:
+          type:
+            - string
+            - 'null'
+        externalOk:
+          type: boolean
+        gatewayOk:
+          type:
+            - boolean
+            - 'null'
+        externalLatencyMs:
+          type:
+            - integer
+            - 'null'
+        gatewayLatencyMs:
+          type:
+            - integer
+            - 'null'
+        failureReason:
+          type:
+            - string
+            - 'null'
+    CurrentStatus:
+      type: object
+      required:
+        - observedAt
+        - status
+        - staleAfterSeconds
+      properties:
+        observedAt:
+          type: integer
+        status:
+          type: string
+          enum: [ok, global_down, local_down, stale]
+        externalTarget:
+          type: string
+        gatewayIp:
+          type:
+            - string
+            - 'null'
+        externalOk:
+          type: boolean
+        gatewayOk:
+          type:
+            - boolean
+            - 'null'
+        staleAfterSeconds:
+          type: integer
+        lastChangeAt:
+          type: integer
+    HistoryBucket:
+      type: object
+      required:
+        - bucketStart
+        - bucketEnd
+        - dominantStatus
+        - sampleCount
+        - downCount
+      properties:
+        bucketStart:
+          type: integer
+        bucketEnd:
+          type: integer
+        dominantStatus:
+          type: string
+          enum: [ok, global_down, local_down]
+        sampleCount:
+          type: integer
+        downCount:
+          type: integer
+        samples:
+          type: array
+          items:
+            $ref: '#/components/schemas/MonitorSample'
+    BootstrapResponse:
+      type: object
+      required:
+        - current
+        - history
+        - retentionDays
+        - sampleIntervalSeconds
+      properties:
+        current:
+          $ref: '#/components/schemas/CurrentStatus'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryBucket'
+        retentionDays:
+          type: integer
+        sampleIntervalSeconds:
+          type: integer
+    HistoryResponse:
+      type: object
+      required:
+        - from
+        - to
+        - bucket
+        - series
+      properties:
+        from:
+          type: integer
+        to:
+          type: integer
+        bucket:
+          type: integer
+        series:
+          type: array
+          items:
+            $ref: '#/components/schemas/HistoryBucket'
