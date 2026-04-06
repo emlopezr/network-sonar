@@ -91,10 +91,42 @@ describe("dashboard timeline", () => {
                   failureReason: "timeout"
                 }
               ],
+              historySegments: [
+                {
+                  status: "ok",
+                  startedAt: 1_710_000_000,
+                  endedAt: 1_710_000_300,
+                  visibleStart: 1_710_000_000,
+                  visibleEnd: 1_710_000_300,
+                  durationSeconds: 300,
+                  sampleCount: 1,
+                  lastObservedAt: 1_710_000_000,
+                  latestFailureReason: null,
+                  latestLatencyMs: 12,
+                  startedBeforeRange: false,
+                  endsAfterRange: false
+                },
+                {
+                  status: "down",
+                  startedAt: 1_710_000_300,
+                  endedAt: null,
+                  visibleStart: 1_710_000_300,
+                  visibleEnd: 1_710_000_300,
+                  durationSeconds: 0,
+                  sampleCount: 1,
+                  lastObservedAt: 1_710_000_300,
+                  latestFailureReason: "timeout",
+                  latestLatencyMs: null,
+                  startedBeforeRange: false,
+                  endsAfterRange: true
+                }
+              ],
               retentionDays: 30,
               sampleIntervalSeconds: 5,
               monitorSettings: {
                 roundRobinEnabled: false,
+                confirmDownAfter: 2,
+                confirmUpAfter: 2,
                 providers: [
                   {
                     id: 1,
@@ -148,14 +180,15 @@ describe("dashboard timeline", () => {
 
     await waitFor(() => {
       expect(screen.getByText("NETWORK SONAR")).toBeInTheDocument();
-      expect(screen.getByText("Connectivity Heatmap (last 1 hour)")).toBeInTheDocument();
-      expect(screen.getByText("Samples: 2")).toBeInTheDocument();
+      expect(screen.getByText("Connectivity Timeline (last 1 hour)")).toBeInTheDocument();
+      expect(screen.getByText("Segments: 2")).toBeInTheDocument();
       expect(screen.getByText("Show provider summary")).toBeInTheDocument();
     });
 
-    expect(screen.getByRole("button", { name: "Refresh range" })).toBeInTheDocument();
-    expect(screen.getByText("Sample #2")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+    expect(screen.getByText("Segment DOWN")).toBeInTheDocument();
     expect(screen.getByText("timeout")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "View raw detail" })).toBeInTheDocument();
 
     act(() => {
       screen.getByRole("button", { name: /show provider summary/i }).click();
@@ -175,6 +208,18 @@ describe("dashboard timeline", () => {
 
     act(() => {
       source.onopen?.();
+      source.emit("snapshot", {
+        current: {
+          observedAt: 1_710_000_600,
+          status: "down",
+          externalTarget: "1.1.1.1",
+          externalOk: false,
+          externalLatencyMs: null,
+          failureReason: "icmp-unreachable",
+          staleAfterSeconds: 15,
+          lastChangeAt: 1_710_000_300
+        }
+      });
       source.emit("sample", {
         observedAt: 1_710_000_600,
         status: "down",
@@ -186,11 +231,12 @@ describe("dashboard timeline", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText("Samples: 3")).toBeInTheDocument();
-      expect(screen.getByText("Sample #3")).toBeInTheDocument();
-      expect(screen.getByText("icmp-unreachable")).toBeInTheDocument();
+      expect(screen.getByText("Segments: 2")).toBeInTheDocument();
+      expect(screen.getByText("Segment DOWN")).toBeInTheDocument();
+      expect(screen.getByText("Duration")).toBeInTheDocument();
       expect(screen.getAllByText("Successful Probes").length).toBeGreaterThan(0);
       expect(screen.getByRole("button", { name: "Manage providers" })).toBeInTheDocument();
     });
   });
+
 });

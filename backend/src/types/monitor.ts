@@ -3,6 +3,11 @@ export const monitorStatuses = ["ok", "down"] as const;
 export type MonitorStatus = (typeof monitorStatuses)[number];
 export type SnapshotStatus = MonitorStatus | "stale";
 
+export interface ConfirmationThresholds {
+  confirmDownAfter: number;
+  confirmUpAfter: number;
+}
+
 export interface PersistedMonitorSample {
   observedAt: number;
   status: MonitorStatus;
@@ -21,6 +26,20 @@ export interface CurrentStatusSnapshot {
   failureReason: string | null;
   staleAfterSeconds: number;
   lastChangeAt: number;
+}
+
+export interface MonitorSensitivityRevision extends ConfirmationThresholds {
+  id: number;
+  effectiveAt: number;
+  createdAt: number;
+}
+
+export interface MonitorStateTransition {
+  id: number;
+  status: MonitorStatus;
+  effectiveAt: number;
+  confirmedAt: number;
+  createdAt: number;
 }
 
 export interface MonitorProbeResult {

@@ -67,14 +67,6 @@ function getLastIncidentCopy(incident: OutageIncident | null): string {
   return formatDateTime(incident.startedAt);
 }
 
-function formatIncidentReason(reason: string | null): string {
-  if (!reason) {
-    return "No error detail";
-  }
-
-  return `${reason.charAt(0).toUpperCase()}${reason.slice(1)}`;
-}
-
 export function IncidentsPage({
   onNavigate = () => undefined
 }: {
@@ -199,8 +191,12 @@ export function IncidentsPage({
             <span className="incident-overview__label">Latest outage</span>
             {orderedIncidents[0] ? (
               <strong className="mono incident-overview__timestamp">
-                <span>{formatDateParts(orderedIncidents[0].startedAt).date}</span>
-                <span>{formatDateParts(orderedIncidents[0].startedAt).time}</span>
+                <span className="incident-overview__timestamp-date">
+                  {formatDateParts(orderedIncidents[0].startedAt).date}
+                </span>
+                <span className="incident-overview__timestamp-time">
+                  {formatDateParts(orderedIncidents[0].startedAt).time}
+                </span>
               </strong>
             ) : (
               <strong className="mono">{getLastIncidentCopy(null)}</strong>
@@ -228,7 +224,7 @@ export function IncidentsPage({
             <span className="incident-range-copy mono">{getRangeLabel(range)}</span>
             <span className="control-bar__divider" aria-hidden="true" />
             <button type="button" className="control-bar__refresh mono" onClick={() => void refreshIncidents()}>
-              Refresh range
+              Refresh
             </button>
           </div>
         </section>
@@ -261,18 +257,14 @@ export function IncidentsPage({
                       onClick={() => setSelectedIncident(incident)}
                     >
                       <div className="incident-list__headline">
-                        <div>
-                          <p className="mono incident-list__timestamp">{formatDateTime(incident.startedAt)}</p>
-                          <p className="incident-list__reason">
-                            {formatIncidentReason(incident.latestFailureReason)}
-                          </p>
-                        </div>
+                        <p className="mono incident-list__timestamp">
+                          {formatDateTime(incident.startedAt)} // {formatDuration(incident.durationSeconds)}
+                        </p>
                         <span className={`incident-list__status incident-list__status--${incident.status}`}>
                           {getIncidentStatusCopy(incident.status)}
                         </span>
                       </div>
                       <div className="incident-list__meta mono">
-                        <span>{formatDuration(incident.durationSeconds)}</span>
                         <span>{incident.sampleCount} samples</span>
                         <span>{incident.externalTarget}</span>
                       </div>

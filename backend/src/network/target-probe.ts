@@ -43,21 +43,23 @@ export async function runProbeSequence(
     throw new Error("At least one monitor target must be configured.");
   }
 
-  const failedProbes: MonitorProbeResult[] = [];
+  const probes = await Promise.all(
+    targets.map(async (target) => ({
+      target,
+      probe: await probeRunner(binary, target, timeoutMs)
+    }))
+  );
 
-  for (const target of targets) {
-    const probe = await probeRunner(binary, target, timeoutMs);
-
+  for (const { target, probe } of probes) {
     if (probe.ok) {
       return {
         externalTarget: target,
         externalProbe: probe
       };
     }
-
-    failedProbes.push(probe);
   }
 
+  const failedProbes = probes.map(({ probe }) => probe);
   const lastProbe = failedProbes[failedProbes.length - 1];
 
   if (!lastProbe) {

@@ -36,6 +36,8 @@ export class ConnectionLogRepository implements ConnectionLogStore {
 
   private readonly rangeStatement;
 
+  private readonly allStatement;
+
   private readonly purgeStatement;
 
   private readonly rowByObservedAtStatement;
@@ -73,6 +75,10 @@ export class ConnectionLogRepository implements ConnectionLogStore {
     this.rangeStatement = this.database.prepare(`
       SELECT id, observed_at, status_code, external_target, external_ok, external_latency_ms, failure_reason, created_at FROM connection_logs
       WHERE observed_at >= ? AND observed_at <= ?
+      ORDER BY observed_at ASC
+    `);
+    this.allStatement = this.database.prepare(`
+      SELECT id, observed_at, status_code, external_target, external_ok, external_latency_ms, failure_reason, created_at FROM connection_logs
       ORDER BY observed_at ASC
     `);
     this.purgeStatement = this.database.prepare(
@@ -113,6 +119,10 @@ export class ConnectionLogRepository implements ConnectionLogStore {
 
   public getRange(from: number, to: number): StoredConnectionLog[] {
     return (this.rangeStatement.all(from, to) as ConnectionLogRow[]).map(mapRow);
+  }
+
+  public getAll(): StoredConnectionLog[] {
+    return (this.allStatement.all() as ConnectionLogRow[]).map(mapRow);
   }
 
   public purgeOlderThan(cutoffUnixSeconds: number): number {

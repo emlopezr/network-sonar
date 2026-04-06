@@ -25,6 +25,7 @@ describe("quickstart smoke flow", () => {
     const bootstrapBody = bootstrap.body as unknown as BootstrapResponse;
     expect(bootstrap.status).toBe(200);
     expect(bootstrapBody.current.status).toBe("ok");
+    expect(bootstrapBody.historySegments).toHaveLength(1);
     expect(bootstrapBody.monitorSettings.roundRobinEnabled).toBe(false);
     expect(bootstrapBody.monitorSettings.providers.length).toBeGreaterThan(2);
 

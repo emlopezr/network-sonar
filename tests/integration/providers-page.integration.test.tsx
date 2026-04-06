@@ -57,6 +57,8 @@ describe("providers page", () => {
               sampleIntervalSeconds: 5,
               monitorSettings: {
                 roundRobinEnabled: false,
+                confirmDownAfter: 2,
+                confirmUpAfter: 2,
                 providers: [
                   {
                     id: 1,

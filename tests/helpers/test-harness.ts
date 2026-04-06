@@ -5,6 +5,7 @@ import { createApp } from "../../backend/src/app";
 import type { AppConfig } from "../../backend/src/config";
 import { ConnectionLogRepository } from "../../backend/src/data/connection-log-repository";
 import { initializeDatabase } from "../../backend/src/data/db";
+import { MonitorStateTransitionRepository } from "../../backend/src/data/monitor-state-transition-repository";
 import { MonitorSettingsRepository } from "../../backend/src/data/monitor-settings-repository";
 import { PurgeService } from "../../backend/src/data/purge-service";
 import { MonitorScheduler } from "../../backend/src/network/monitor-scheduler";
@@ -20,6 +21,7 @@ export interface TestHarness {
   config: AppConfig;
   database: Database.Database;
   repository: ConnectionLogRepository;
+  transitionRepository: MonitorStateTransitionRepository;
   purgeService: PurgeService;
   currentStatusService: CurrentStatusService;
   historyService: HistoryService;
@@ -58,28 +60,44 @@ export function createTestHarness(): TestHarness {
       pingTimeoutMs: 3000,
       pingBinary: "ping",
       heartbeatSeconds: 15,
-      roundRobinEnabled: false
+      roundRobinEnabled: false,
+      confirmDownAfter: 2,
+      confirmUpAfter: 2
     }
   };
 
   const database = initializeDatabase(config.monitor.dbPath);
   const repository = new ConnectionLogRepository(database);
+  const transitionRepository = new MonitorStateTransitionRepository(database);
   const monitorSettingsRepository = new MonitorSettingsRepository(database);
-  const currentStatusService = new CurrentStatusService(repository, config.monitor.staleAfterSeconds);
-  const historyService = new HistoryService(repository, config.monitor.intervalSeconds);
+  const currentStatusService = new CurrentStatusService(
+    repository,
+    transitionRepository,
+    monitorSettingsRepository,
+    config.monitor.staleAfterSeconds
+  );
+  const historyService = new HistoryService(
+    repository,
+    transitionRepository,
+    config.monitor.intervalSeconds
+  );
   const eventBus = new MonitorEventBus();
   const monitorSettingsService = new MonitorSettingsService(
     monitorSettingsRepository,
     eventBus,
     config.monitor.targets,
-    config.monitor.roundRobinEnabled
+    config.monitor.roundRobinEnabled,
+    {
+      confirmDownAfter: config.monitor.confirmDownAfter,
+      confirmUpAfter: config.monitor.confirmUpAfter
+    }
   );
   monitorSettingsService.initialize();
   const monitorService = new MonitorService(
     repository,
     currentStatusService,
     eventBus,
-    historyService
+    monitorSettingsService
   );
   const purgeService = new PurgeService(repository, config.monitor.retentionDays);
 
@@ -96,6 +114,7 @@ export function createTestHarness(): TestHarness {
     config,
     database,
     repository,
+    transitionRepository,
     purgeService,
     currentStatusService,
     historyService,

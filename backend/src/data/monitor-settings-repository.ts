@@ -1,13 +1,20 @@
 import type Database from "better-sqlite3";
 
 import type {
+  ConfirmationThresholds,
+  MonitorSensitivityRevision
+} from "../types/monitor";
+import type {
   MonitorProviderKind,
   MonitorProviderRecord,
   MonitorProviderSeed
 } from "../types/api";
+import type { MonitorSettingsStore } from "../types/storage";
 
 interface MonitorSettingsRow {
   round_robin_enabled: number;
+  confirm_down_after: number;
+  confirm_up_after: number;
 }
 
 interface MonitorProviderRow {
@@ -47,9 +54,15 @@ function mapProviderRow(row: MonitorProviderRow): MonitorProviderRecord {
 export class MonitorSettingsRepository {
   private readonly insertSettingsStatement;
 
-  private readonly updateRoundRobinStatement;
+  private readonly updateSettingsStatement;
 
   private readonly settingsStatement;
+
+  private readonly sensitivityRevisionCountStatement;
+
+  private readonly insertSensitivityRevisionStatement;
+
+  private readonly sensitivityRevisionListStatement;
 
   private readonly providerListStatement;
 
@@ -73,20 +86,52 @@ export class MonitorSettingsRepository {
 
   public constructor(private readonly database: Database.Database) {
     this.insertSettingsStatement = this.database.prepare(`
-      INSERT OR IGNORE INTO monitor_settings (id, round_robin_enabled)
-      VALUES (1, @round_robin_enabled)
+      INSERT OR IGNORE INTO monitor_settings (
+        id,
+        round_robin_enabled,
+        confirm_down_after,
+        confirm_up_after
+      )
+      VALUES (
+        1,
+        @round_robin_enabled,
+        @confirm_down_after,
+        @confirm_up_after
+      )
     `);
-    this.updateRoundRobinStatement = this.database.prepare(`
+    this.updateSettingsStatement = this.database.prepare(`
       UPDATE monitor_settings
       SET round_robin_enabled = @round_robin_enabled,
+          confirm_down_after = @confirm_down_after,
+          confirm_up_after = @confirm_up_after,
           updated_at = unixepoch()
       WHERE id = 1
     `);
     this.settingsStatement = this.database.prepare(`
-      SELECT round_robin_enabled
+      SELECT round_robin_enabled, confirm_down_after, confirm_up_after
       FROM monitor_settings
       WHERE id = 1
       LIMIT 1
+    `);
+    this.sensitivityRevisionCountStatement = this.database.prepare(`
+      SELECT COUNT(*) AS count
+      FROM monitor_sensitivity_revisions
+    `);
+    this.insertSensitivityRevisionStatement = this.database.prepare(`
+      INSERT INTO monitor_sensitivity_revisions (
+        effective_at,
+        confirm_down_after,
+        confirm_up_after
+      ) VALUES (
+        @effective_at,
+        @confirm_down_after,
+        @confirm_up_after
+      )
+    `);
+    this.sensitivityRevisionListStatement = this.database.prepare(`
+      SELECT id, effective_at, confirm_down_after, confirm_up_after, created_at
+      FROM monitor_sensitivity_revisions
+      ORDER BY effective_at ASC, id ASC
     `);
     this.providerListStatement = this.database.prepare(`
       SELECT id, label, target, company, logo_url, kind, is_default, is_enabled, sort_order
@@ -154,11 +199,14 @@ export class MonitorSettingsRepository {
 
   public initialize(
     roundRobinEnabled: boolean,
+    thresholds: ConfirmationThresholds,
     defaultProviders: DefaultProviderBootstrap[]
   ): void {
     const transaction = this.database.transaction(() => {
       this.insertSettingsStatement.run({
-        round_robin_enabled: roundRobinEnabled ? 1 : 0
+        round_robin_enabled: roundRobinEnabled ? 1 : 0,
+        confirm_down_after: thresholds.confirmDownAfter,
+        confirm_up_after: thresholds.confirmUpAfter
       });
 
       for (const provider of defaultProviders) {
@@ -170,25 +218,69 @@ export class MonitorSettingsRepository {
           sort_order: provider.sortOrder
         });
       }
+
+      const revisionCount = this.sensitivityRevisionCountStatement.get() as { count: number } | undefined;
+
+      if ((revisionCount?.count ?? 0) === 0) {
+        const settings = this.getSettings();
+        this.insertSensitivityRevisionStatement.run({
+          effective_at: 0,
+          confirm_down_after: settings.confirmDownAfter,
+          confirm_up_after: settings.confirmUpAfter
+        });
+      }
     });
 
     transaction();
   }
 
-  public getRoundRobinEnabled(): boolean {
+  public getSettings(): MonitorSettingsStore {
     const row = this.settingsStatement.get() as MonitorSettingsRow | undefined;
 
     if (!row) {
       throw new Error("Monitor settings have not been initialized.");
     }
 
-    return Boolean(row.round_robin_enabled);
+    return {
+      roundRobinEnabled: Boolean(row.round_robin_enabled),
+      confirmDownAfter: row.confirm_down_after,
+      confirmUpAfter: row.confirm_up_after
+    };
   }
 
-  public updateRoundRobinEnabled(roundRobinEnabled: boolean): void {
-    this.updateRoundRobinStatement.run({
-      round_robin_enabled: roundRobinEnabled ? 1 : 0
+  public updateSettings(settings: MonitorSettingsStore): void {
+    this.updateSettingsStatement.run({
+      round_robin_enabled: settings.roundRobinEnabled ? 1 : 0,
+      confirm_down_after: settings.confirmDownAfter,
+      confirm_up_after: settings.confirmUpAfter
     });
+  }
+
+  public addSensitivityRevision(
+    effectiveAt: number,
+    thresholds: ConfirmationThresholds
+  ): void {
+    this.insertSensitivityRevisionStatement.run({
+      effective_at: effectiveAt,
+      confirm_down_after: thresholds.confirmDownAfter,
+      confirm_up_after: thresholds.confirmUpAfter
+    });
+  }
+
+  public listSensitivityRevisions(): MonitorSensitivityRevision[] {
+    return (this.sensitivityRevisionListStatement.all() as Array<{
+      id: number;
+      effective_at: number;
+      confirm_down_after: number;
+      confirm_up_after: number;
+      created_at: number;
+    }>).map((row) => ({
+      id: row.id,
+      effectiveAt: row.effective_at,
+      confirmDownAfter: row.confirm_down_after,
+      confirmUpAfter: row.confirm_up_after,
+      createdAt: row.created_at
+    }));
   }
 
   public listProviders(): MonitorProviderRecord[] {

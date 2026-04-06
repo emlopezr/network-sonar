@@ -16,7 +16,7 @@ const navigationItems: Array<{ id: AppPage; label: string; path: AppPath }> = [
   },
   {
     id: "providers",
-    label: "Providers",
+    label: "Configuration",
     path: "/providers"
   }
 ];

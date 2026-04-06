@@ -19,8 +19,10 @@ import type {
   CurrentStatusSnapshot,
   MonitorProviderRecord,
   MonitorSample,
-  MonitorSettings
+  MonitorSettings,
+  RangePreset
 } from "../types/monitor";
+import { rangePresets } from "../types/monitor";
 import {
   buildProviderRuntimeStats,
   getMonitorModeLabel
@@ -29,26 +31,21 @@ import { getRangeSeconds } from "../utils/range";
 
 const defaultMonitorSettings: MonitorSettings = {
   roundRobinEnabled: false,
+  confirmDownAfter: 2,
+  confirmUpAfter: 2,
   providers: []
 };
 
-function normalizeCurrentSnapshot(
-  previous: CurrentStatusSnapshot | null,
-  sample: MonitorSample
-): CurrentStatusSnapshot {
-  const staleAfterSeconds = previous?.staleAfterSeconds ?? 15;
-  const lastChangeAt =
-    !previous || previous.status !== sample.status ? sample.observedAt : previous.lastChangeAt;
+function normalizeMonitorSettings(settings: MonitorSettings | undefined): MonitorSettings {
+  if (!settings) {
+    return defaultMonitorSettings;
+  }
 
   return {
-    observedAt: sample.observedAt,
-    status: sample.status,
-    externalTarget: sample.externalTarget,
-    externalOk: sample.externalOk,
-    externalLatencyMs: sample.externalLatencyMs,
-    failureReason: sample.failureReason,
-    staleAfterSeconds,
-    lastChangeAt
+    roundRobinEnabled: settings.roundRobinEnabled,
+    confirmDownAfter: settings.confirmDownAfter,
+    confirmUpAfter: settings.confirmUpAfter,
+    providers: settings.providers ?? []
   };
 }
 
@@ -71,8 +68,10 @@ export function ProvidersPage({
   const [monitorSettings, setMonitorSettings] = useState<MonitorSettings>(defaultMonitorSettings);
   const [current, setCurrent] = useState<CurrentStatusSnapshot | null>(null);
   const [history, setHistory] = useState<MonitorSample[]>([]);
+  const [range, setRange] = useState<RangePreset>("24h");
   const [error, setError] = useState<string | null>(null);
   const [savingRoundRobin, setSavingRoundRobin] = useState(false);
+  const [savingSensitivity, setSavingSensitivity] = useState(false);
   const [pendingProviderId, setPendingProviderId] = useState<number | null>(null);
   const [savingProviderForm, setSavingProviderForm] = useState(false);
   const [isProviderModalOpen, setIsProviderModalOpen] = useState(false);
@@ -80,8 +79,10 @@ export function ProvidersPage({
   const [customLabel, setCustomLabel] = useState("");
   const [customTarget, setCustomTarget] = useState("");
   const [customLogoUrl, setCustomLogoUrl] = useState("");
+  const [confirmDownAfterInput, setConfirmDownAfterInput] = useState("2");
+  const [confirmUpAfterInput, setConfirmUpAfterInput] = useState("2");
 
-  const rangeWindow = getRangeSeconds("24h");
+  const rangeWindow = getRangeSeconds(range);
   const providerStats = useMemo(
     () =>
       buildProviderRuntimeStats(
@@ -99,7 +100,7 @@ export function ProvidersPage({
       setError(null);
 
       try {
-        const payload: BootstrapResponse = await fetchBootstrap("24h");
+        const payload: BootstrapResponse = await fetchBootstrap(range);
 
         if (cancelled) {
           return;
@@ -108,7 +109,9 @@ export function ProvidersPage({
         startTransition(() => {
           setCurrent(payload.current);
           setHistory(payload.history);
-          setMonitorSettings(payload.monitorSettings);
+          setMonitorSettings(normalizeMonitorSettings(payload.monitorSettings));
+          setConfirmDownAfterInput(String(payload.monitorSettings.confirmDownAfter));
+          setConfirmUpAfterInput(String(payload.monitorSettings.confirmUpAfter));
         });
       } catch (loadError) {
         if (!cancelled) {
@@ -126,7 +129,7 @@ export function ProvidersPage({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [range]);
 
   useEffect(() => {
     const disconnect = connectStatusStream({
@@ -135,13 +138,17 @@ export function ProvidersPage({
         setCurrent(payload.current);
       },
       onSettings: (payload) => {
-        setMonitorSettings(payload.monitorSettings);
+        const settings = normalizeMonitorSettings(payload.monitorSettings);
+
+        setMonitorSettings(settings);
+        setConfirmDownAfterInput(String(settings.confirmDownAfter));
+        setConfirmUpAfterInput(String(settings.confirmUpAfter));
         setSavingRoundRobin(false);
+        setSavingSensitivity(false);
         setPendingProviderId(null);
         setSavingProviderForm(false);
       },
       onSample: (payload) => {
-        setCurrent((previous) => normalizeCurrentSnapshot(previous, payload));
         setHistory((previous) =>
           mergeHistorySample(previous, payload, payload.observedAt - rangeWindow)
         );
@@ -214,9 +221,9 @@ export function ProvidersPage({
     try {
       setSavingRoundRobin(true);
       setError(null);
-      const updatedSettings = await updateMonitorSettings({
+      const updatedSettings = normalizeMonitorSettings(await updateMonitorSettings({
         roundRobinEnabled: !monitorSettings.roundRobinEnabled
-      });
+      }));
       setMonitorSettings(updatedSettings);
     } catch (updateError) {
       setError(
@@ -226,6 +233,41 @@ export function ProvidersPage({
       );
     } finally {
       setSavingRoundRobin(false);
+    }
+  }
+
+  async function handleSubmitSensitivity(): Promise<void> {
+    const confirmDownAfter = Number.parseInt(confirmDownAfterInput, 10);
+    const confirmUpAfter = Number.parseInt(confirmUpAfterInput, 10);
+
+    if (
+      !Number.isInteger(confirmDownAfter) ||
+      confirmDownAfter <= 0 ||
+      !Number.isInteger(confirmUpAfter) ||
+      confirmUpAfter <= 0
+    ) {
+      setError("Confirmation thresholds must be positive integers.");
+      return;
+    }
+
+    try {
+      setSavingSensitivity(true);
+      setError(null);
+      const updatedSettings = normalizeMonitorSettings(await updateMonitorSettings({
+        confirmDownAfter,
+        confirmUpAfter
+      }));
+      setMonitorSettings(updatedSettings);
+      setConfirmDownAfterInput(String(updatedSettings.confirmDownAfter));
+      setConfirmUpAfterInput(String(updatedSettings.confirmUpAfter));
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Could not update the confirmation thresholds."
+      );
+    } finally {
+      setSavingSensitivity(false);
     }
   }
 
@@ -240,9 +282,11 @@ export function ProvidersPage({
         target: customTarget,
         logoUrl: customLogoUrl
       };
-      const updatedSettings = editingProviderId === null
-        ? await createMonitorProvider(payload)
-        : await updateMonitorProvider(editingProviderId, payload);
+      const updatedSettings = normalizeMonitorSettings(
+        editingProviderId === null
+          ? await createMonitorProvider(payload)
+          : await updateMonitorProvider(editingProviderId, payload)
+      );
       setMonitorSettings(updatedSettings);
       setEditingProviderId(null);
       resetCreateProviderForm();
@@ -264,9 +308,9 @@ export function ProvidersPage({
     try {
       setPendingProviderId(provider.id);
       setError(null);
-      const updatedSettings = await updateMonitorProvider(provider.id, {
+      const updatedSettings = normalizeMonitorSettings(await updateMonitorProvider(provider.id, {
         isEnabled: !provider.isEnabled
-      });
+      }));
       setMonitorSettings(updatedSettings);
     } catch (updateError) {
       setError(
@@ -299,9 +343,9 @@ export function ProvidersPage({
     try {
       setPendingProviderId(providerId);
       setError(null);
-      const updatedSettings = await reorderMonitorProviders({
+      const updatedSettings = normalizeMonitorSettings(await reorderMonitorProviders({
         providerIds: reorderedProviders.map((provider) => provider.id)
-      });
+      }));
       setMonitorSettings(updatedSettings);
     } catch (reorderError) {
       setError(
@@ -318,7 +362,7 @@ export function ProvidersPage({
     try {
       setPendingProviderId(provider.id);
       setError(null);
-      const updatedSettings = await deleteMonitorProvider(provider.id);
+      const updatedSettings = normalizeMonitorSettings(await deleteMonitorProvider(provider.id));
       setMonitorSettings(updatedSettings);
     } catch (deleteError) {
       setError(
@@ -338,7 +382,7 @@ export function ProvidersPage({
       topbarContent={
         <div className="dashboard-topbar__context">
           <span className="dashboard-topbar__context-mark" aria-hidden="true" />
-          <span className="mono">PROVIDER CONTROL</span>
+          <span className="mono">CONFIGURATION</span>
         </div>
       }
     >
@@ -368,61 +412,71 @@ export function ProvidersPage({
           </article>
         </section>
 
-        <section className="control-bar">
-          <div className="control-bar__actions">
-            <div className="live-switch">
-              <span className="live-switch__label mono">Round Robin</span>
+        <div className="configuration-forms">
+          <section className="providers-form">
+            <div className="providers-form__copy">
+              <p className="eyebrow">Incident sensitivity</p>
+              <h2>Confirmation thresholds</h2>
+              <p>
+                Require consecutive failures or recoveries before the confirmed state changes. Updates only affect future samples.
+              </p>
+            </div>
+            <div className="provider-modal__form">
+              <label className="providers-form__field" htmlFor="confirm-down-after">
+                <span>Down After</span>
+                <input
+                  id="confirm-down-after"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={confirmDownAfterInput}
+                  onChange={(event) => setConfirmDownAfterInput(event.target.value)}
+                />
+              </label>
+              <label className="providers-form__field" htmlFor="confirm-up-after">
+                <span>Recover After</span>
+                <input
+                  id="confirm-up-after"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={confirmUpAfterInput}
+                  onChange={(event) => setConfirmUpAfterInput(event.target.value)}
+                />
+              </label>
+              <div className="provider-modal__actions">
+                <span className="providers-form__hint mono">
+                  Current: {monitorSettings.confirmDownAfter}/{monitorSettings.confirmUpAfter}
+                </span>
+                <button
+                  type="button"
+                  className="providers-form__submit"
+                  disabled={savingSensitivity}
+                  onClick={() => void handleSubmitSensitivity()}
+                >
+                  {savingSensitivity ? "Saving" : "Update sensitivity"}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="providers-form">
+            <div className="providers-form__copy">
+              <p className="eyebrow">Custom target</p>
+              <h2>Add a custom provider</h2>
+              <p>
+                Add any reliable IP or hostname and optionally attach a logo URL. Default providers stay protected and cannot be deleted.
+              </p>
+            </div>
+            <div className="providers-form__actions">
               <button
                 type="button"
-                className={`live-switch__toggle${monitorSettings.roundRobinEnabled ? " is-active" : ""}`}
-                aria-pressed={monitorSettings.roundRobinEnabled}
-                aria-label="Toggle round robin providers"
-                disabled={savingRoundRobin}
-                onClick={() => void handleRoundRobinToggle()}
+                className="providers-form__submit"
+                onClick={() => openCreateProviderModal()}
               >
-                <span className="live-switch__thumb" />
+                Add provider
               </button>
-              <span className={`live-switch__value mono${monitorSettings.roundRobinEnabled ? " is-active" : ""}`}>
-                {savingRoundRobin
-                  ? "SAVING"
-                  : monitorSettings.roundRobinEnabled
-                    ? "ON"
-                    : "OFF"}
-              </span>
             </div>
-          </div>
-          <div className="control-bar__actions">
-            <span className="incident-range-copy mono">Average ping window: 24h</span>
-            <span className="control-bar__divider" aria-hidden="true" />
-            <button
-              type="button"
-              className="control-bar__refresh mono"
-              onClick={() => onNavigate("/")}
-            >
-              Back to dashboard
-            </button>
-          </div>
-        </section>
-
-        <section className="providers-form">
-          <div className="providers-form__copy">
-            <p className="eyebrow">Custom target</p>
-            <h2>Add a custom provider</h2>
-            <p>
-              Add any reliable IP or hostname and optionally attach a logo URL. Default providers stay protected and cannot be deleted.
-            </p>
-          </div>
-          <div className="providers-form__actions">
-            <span className="providers-form__hint mono">Logo URL is optional</span>
-            <button
-              type="button"
-              className="providers-form__submit"
-              onClick={() => openCreateProviderModal()}
-            >
-              Add provider
-            </button>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <section className="providers-list-panel">
           <div className="providers-list-panel__header">
@@ -430,9 +484,45 @@ export function ProvidersPage({
               <p className="eyebrow">Ordered catalog</p>
               <h2>Provider list</h2>
             </div>
-            <span className="mono providers-list-panel__count">
-              {monitorSettings.providers.length} providers
-            </span>
+            <div className="providers-list-panel__meta">
+              <div className="control-bar__ranges" role="tablist" aria-label="Provider stats range">
+                {rangePresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    role="tab"
+                    aria-selected={range === preset}
+                    className={`control-bar__range${range === preset ? " is-active" : ""}`}
+                    onClick={() => setRange(preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <div className="live-switch">
+                <span className="live-switch__label mono">Round Robin</span>
+                <button
+                  type="button"
+                  className={`live-switch__toggle${monitorSettings.roundRobinEnabled ? " is-active" : ""}`}
+                  aria-pressed={monitorSettings.roundRobinEnabled}
+                  aria-label="Toggle round robin providers"
+                  disabled={savingRoundRobin}
+                  onClick={() => void handleRoundRobinToggle()}
+                >
+                  <span className="live-switch__thumb" />
+                </button>
+                <span className={`live-switch__value mono${monitorSettings.roundRobinEnabled ? " is-active" : ""}`}>
+                  {savingRoundRobin
+                    ? "SAVING"
+                    : monitorSettings.roundRobinEnabled
+                      ? "ON"
+                      : "OFF"}
+                </span>
+              </div>
+              <span className="mono providers-list-panel__count">
+                {monitorSettings.providers.length} providers
+              </span>
+            </div>
           </div>
 
           <div className="provider-panel__grid provider-panel__grid--management">

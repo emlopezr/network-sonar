@@ -5,6 +5,7 @@ import type {
   HistoryResponse,
   MonitorSettings,
   ReorderMonitorProvidersRequest,
+  TimelineSegmentsResponse,
   UpdateMonitorProviderRequest,
   UpdateMonitorSettingsRequest,
   RangePreset
@@ -37,6 +38,14 @@ export async function fetchBootstrap(range: RangePreset): Promise<BootstrapRespo
 export async function fetchHistory(from: number, to: number): Promise<HistoryResponse> {
   const response = await fetch(`/api/v1/history?from=${from}&to=${to}`);
   return parseJsonResponse<HistoryResponse>(response);
+}
+
+export async function fetchHistorySegments(
+  from: number,
+  to: number
+): Promise<TimelineSegmentsResponse> {
+  const response = await fetch(`/api/v1/history/segments?from=${from}&to=${to}`);
+  return parseJsonResponse<TimelineSegmentsResponse>(response);
 }
 
 export async function fetchIncidents(from: number, to: number): Promise<IncidentHistoryResponse> {

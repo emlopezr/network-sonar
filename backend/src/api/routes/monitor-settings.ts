@@ -15,12 +15,23 @@ import {
 function isUpdateMonitorSettingsRequest(
   value: unknown
 ): value is UpdateMonitorSettingsRequest {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "roundRobinEnabled" in value &&
-    typeof value.roundRobinEnabled === "boolean"
-  );
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const patch = value as Record<string, unknown>;
+  const hasRoundRobinEnabled =
+    "roundRobinEnabled" in patch && typeof patch.roundRobinEnabled === "boolean";
+  const hasConfirmDownAfter =
+    "confirmDownAfter" in patch &&
+    Number.isInteger(patch.confirmDownAfter) &&
+    Number(patch.confirmDownAfter) > 0;
+  const hasConfirmUpAfter =
+    "confirmUpAfter" in patch &&
+    Number.isInteger(patch.confirmUpAfter) &&
+    Number(patch.confirmUpAfter) > 0;
+
+  return hasRoundRobinEnabled || hasConfirmDownAfter || hasConfirmUpAfter;
 }
 
 function isCreateMonitorProviderRequest(
@@ -89,14 +100,13 @@ export function createMonitorSettingsRouter(
   router.patch("/api/v1/monitor/settings", (request, response) => {
     if (!isUpdateMonitorSettingsRequest(request.body)) {
       response.status(400).json({
-        error: "roundRobinEnabled must be provided as a boolean."
+        error: "Provide roundRobinEnabled as a boolean and/or confirmDownAfter and confirmUpAfter as positive integers."
       });
       return;
     }
 
     try {
-      const { roundRobinEnabled } = request.body;
-      response.json(monitorSettingsService.updateRoundRobinEnabled(roundRobinEnabled));
+      response.json(monitorSettingsService.updateSettings(request.body));
     } catch (error) {
       sendMonitorSettingsError(error, response);
     }

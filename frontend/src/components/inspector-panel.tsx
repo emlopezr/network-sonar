@@ -1,4 +1,4 @@
-import type { MonitorSample } from "../types/monitor";
+import type { TimelineSegment } from "../types/monitor";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium"
@@ -17,73 +17,80 @@ function formatTimestamp(unixSeconds: number): { date: string; time: string } {
   };
 }
 
-function getStatusLabel(status: MonitorSample["status"]): string {
-  switch (status) {
-    case "ok":
-      return "OK";
-    case "down":
-      return "DOWN";
+function formatDuration(durationSeconds: number): string {
+  if (durationSeconds < 60) {
+    return `${durationSeconds}s`;
   }
+
+  if (durationSeconds < 3600) {
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+
+    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  }
+
+  const hours = Math.floor(durationSeconds / 3600);
+  const minutes = Math.floor((durationSeconds % 3600) / 60);
+
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
 export function InspectorPanel({
-  sample,
-  sampleIndex
+  segment
 }: {
-  sample: MonitorSample | null;
-  sampleIndex: number;
+  segment: TimelineSegment | null;
 }) {
-  const resolvedSampleIndex = sampleIndex < 0 ? 0 : sampleIndex;
-  const timestamp = sample ? formatTimestamp(sample.observedAt) : null;
-
-  if (!sample) {
+  if (!segment) {
     return (
       <section className="inspector-panel" aria-live="polite">
-        <div className="inspector-panel__tag">
-          <span className="inspector-panel__icon" aria-hidden="true" />
-          <div>
-            <div className="inspector-panel__label">Inspector</div>
-            <div className="inspector-panel__title">Waiting for sample selection</div>
-          </div>
-        </div>
+        <p className="timeline__summary">Waiting for segment selection</p>
       </section>
     );
   }
 
+  const startedAt = formatTimestamp(segment.startedAt);
+  const endedAt = segment.endedAt === null ? null : formatTimestamp(segment.endedAt);
+  const averageLatency =
+    segment.status === "ok" && segment.latestLatencyMs !== null
+      ? `${segment.latestLatencyMs} ms`
+      : "No data";
+
   return (
-    <section className="inspector-panel" aria-live="polite">
-      <div className="inspector-panel__tag">
-        <span className="inspector-panel__icon" aria-hidden="true" />
-        <div>
-          <div className="inspector-panel__label">Inspector</div>
-          <div className="inspector-panel__title mono">Sample #{resolvedSampleIndex + 1}</div>
-        </div>
-      </div>
+    <section className="inspector-panel inspector-panel--segment" aria-live="polite">
       <dl className="inspector-panel__grid">
         <div>
-          <dt>Timestamp</dt>
-          <dd className="mono inspector-panel__timestamp">
-            <span>{timestamp?.date}</span>
-            <span>{timestamp?.time}</span>
+          <dt>Started</dt>
+          <dd className="mono incident-overview__timestamp">
+            <span className="incident-overview__timestamp-date">{startedAt.date}</span>
+            <span className="incident-overview__timestamp-time">{startedAt.time}</span>
           </dd>
         </div>
         <div>
-          <dt>Status</dt>
-          <dd className={`mono inspector-panel__status inspector-panel__status--${sample.status}`}>
-            {getStatusLabel(sample.status)}
+          <dt>Ended</dt>
+          <dd className="mono incident-overview__timestamp">
+            {endedAt ? (
+              <>
+                <span className="incident-overview__timestamp-date">{endedAt.date}</span>
+                <span className="incident-overview__timestamp-time">{endedAt.time}</span>
+              </>
+            ) : (
+              <span className="inspector-panel__timestamp-state">Ongoing</span>
+            )}
           </dd>
         </div>
         <div>
-          <dt>Latency</dt>
-          <dd className="mono">
-            {sample.externalLatencyMs === null ? "No data" : `${sample.externalLatencyMs} ms`}
+          <dt>Duration</dt>
+          <dd className={`mono inspector-panel__status inspector-panel__status--${segment.status}`}>
+            {formatDuration(Math.max(1, segment.durationSeconds))}
           </dd>
         </div>
         <div>
-          <dt>Diagnostic</dt>
-          <dd className="mono inspector-panel__diagnostic">
-            {sample.failureReason ?? "PING Successful"}
-          </dd>
+          <dt>Samples</dt>
+          <dd className="mono">{segment.sampleCount}</dd>
+        </div>
+        <div>
+          <dt>Avg Latency</dt>
+          <dd className="mono">{averageLatency}</dd>
         </div>
       </dl>
     </section>

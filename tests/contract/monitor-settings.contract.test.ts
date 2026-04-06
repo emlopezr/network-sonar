@@ -24,8 +24,28 @@ describe("monitor settings routes", () => {
 
     expect(response.status).toBe(200);
     expect(body.roundRobinEnabled).toBe(true);
+    expect(body.confirmDownAfter).toBe(2);
+    expect(body.confirmUpAfter).toBe(2);
     expect(body.providers.filter((provider) => provider.isEnabled)).toHaveLength(2);
     expect(harness.monitorSettingsService.getSettings().roundRobinEnabled).toBe(true);
+  });
+
+  it("updates confirmation thresholds at runtime", async () => {
+    const response = await request(harness.app)
+      .patch("/api/v1/monitor/settings")
+      .send({
+        confirmDownAfter: 3,
+        confirmUpAfter: 4
+      });
+    const body = response.body as MonitorSettings;
+
+    expect(response.status).toBe(200);
+    expect(body.confirmDownAfter).toBe(3);
+    expect(body.confirmUpAfter).toBe(4);
+    expect(harness.monitorSettingsService.getThresholds()).toEqual({
+      confirmDownAfter: 3,
+      confirmUpAfter: 4
+    });
   });
 
   it("creates, updates, reorders and deletes a custom provider", async () => {
@@ -150,6 +170,9 @@ describe("monitor settings routes", () => {
       .send({ roundRobinEnabled: "yes" });
 
     expect(response.status).toBe(400);
+    expect(response.body).toMatchObject({
+      error: "Provide roundRobinEnabled as a boolean and/or confirmDownAfter and confirmUpAfter as positive integers."
+    });
 
     const invalidLogoResponse = await request(harness.app)
       .post("/api/v1/monitor/providers")

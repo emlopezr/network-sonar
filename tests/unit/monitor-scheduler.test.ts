@@ -42,7 +42,7 @@ describe("MonitorScheduler", () => {
       harness.monitorSettingsService,
       workerRunner
     );
-    harness.monitorSettingsService.updateRoundRobinEnabled(true);
+    harness.monitorSettingsService.updateSettings({ roundRobinEnabled: true });
 
     await (scheduler as unknown as { executeCycle: () => Promise<void> }).executeCycle();
     await (scheduler as unknown as { executeCycle: () => Promise<void> }).executeCycle();
@@ -69,7 +69,7 @@ describe("MonitorScheduler", () => {
     const scheduler = harness.createScheduler(workerRunner);
 
     await (scheduler as unknown as { executeCycle: () => Promise<void> }).executeCycle();
-    harness.monitorSettingsService.updateRoundRobinEnabled(true);
+    harness.monitorSettingsService.updateSettings({ roundRobinEnabled: true });
     await (scheduler as unknown as { executeCycle: () => Promise<void> }).executeCycle();
 
     expect(workerRunner).toHaveBeenNthCalledWith(

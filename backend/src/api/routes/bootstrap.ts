@@ -36,6 +36,7 @@ export function createBootstrapRouter(
     const payload: BootstrapResponse = {
       current: currentStatusService.getCurrentSnapshot(to),
       history: historyService.getHistory(from, to),
+      historySegments: historyService.getTimelineSegments(from, to),
       retentionDays,
       sampleIntervalSeconds,
       monitorSettings: monitorSettingsService.getSettings()

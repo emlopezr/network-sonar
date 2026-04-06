@@ -1,77 +1,144 @@
-import type { CurrentStatusSnapshot, PersistedMonitorSample } from "../types/monitor";
-import type { ConnectionLogStore, StoredConnectionLog } from "../types/storage";
+import {
+  advanceConfirmedState,
+  buildSnapshot,
+  resetPendingState,
+  type ConfirmedMonitorState
+} from "./confirmed-state-machine";
+import type {
+  ConfirmationThresholds,
+  CurrentStatusSnapshot,
+  MonitorSensitivityRevision,
+  PersistedMonitorSample
+} from "../types/monitor";
+import type {
+  ConnectionLogStore,
+  MonitorSettingsStoreReader,
+  TransitionStore
+} from "../types/storage";
+
+function thresholdsEqual(
+  left: ConfirmationThresholds | null,
+  right: ConfirmationThresholds
+): boolean {
+  return (
+    left?.confirmDownAfter === right.confirmDownAfter &&
+    left?.confirmUpAfter === right.confirmUpAfter
+  );
+}
+
+function toThresholds(
+  revision: MonitorSensitivityRevision | ConfirmationThresholds
+): ConfirmationThresholds {
+  return {
+    confirmDownAfter: revision.confirmDownAfter,
+    confirmUpAfter: revision.confirmUpAfter
+  };
+}
 
 export class CurrentStatusService {
-  private latestSample: PersistedMonitorSample | null = null;
+  private currentState: ConfirmedMonitorState | null = null;
 
-  private lastChangeAt = 0;
+  private activeThresholds: ConfirmationThresholds | null = null;
 
   public constructor(
     private readonly repository: ConnectionLogStore,
+    private readonly transitionRepository: TransitionStore,
+    private readonly settingsReader: MonitorSettingsStoreReader,
     private readonly staleAfterSeconds: number
   ) {}
 
   public hydrate(): void {
-    const latest = this.repository.getLatest();
+    const replay = this.replay(this.repository.getAll(), this.settingsReader.listSensitivityRevisions());
 
-    if (!latest) {
-      return;
-    }
-
-    this.latestSample = latest;
-    this.lastChangeAt = this.findLastChangeAt(latest);
+    this.currentState = replay.state;
+    this.activeThresholds = replay.activeThresholds;
+    this.transitionRepository.replaceAll(replay.transitions);
   }
 
-  public update(sample: PersistedMonitorSample): CurrentStatusSnapshot {
-    if (!this.latestSample || this.latestSample.status !== sample.status) {
-      this.lastChangeAt = sample.observedAt;
+  public update(
+    sample: PersistedMonitorSample,
+    thresholds: ConfirmationThresholds
+  ): CurrentStatusSnapshot {
+    if (this.currentState && !thresholdsEqual(this.activeThresholds, thresholds)) {
+      this.currentState = resetPendingState(this.currentState);
     }
 
-    this.latestSample = sample;
+    const result = advanceConfirmedState(this.currentState, sample, thresholds);
+    this.currentState = result.state;
+    this.activeThresholds = thresholds;
+
+    if (result.transition) {
+      this.transitionRepository.insert(result.transition);
+    }
+
     return this.getCurrentSnapshot(sample.observedAt);
   }
 
   public getCurrentSnapshot(now = Math.floor(Date.now() / 1000)): CurrentStatusSnapshot {
-    if (!this.latestSample) {
-      return {
-        observedAt: 0,
-        status: "stale",
-        externalTarget: "",
-        externalOk: false,
-        externalLatencyMs: null,
-        failureReason: null,
-        staleAfterSeconds: this.staleAfterSeconds,
-        lastChangeAt: 0
-      };
-    }
-
-    const isStale = now - this.latestSample.observedAt > this.staleAfterSeconds;
-
-    return {
-      observedAt: this.latestSample.observedAt,
-      status: isStale ? "stale" : this.latestSample.status,
-      externalTarget: this.latestSample.externalTarget,
-      externalOk: this.latestSample.externalOk,
-      externalLatencyMs: this.latestSample.externalLatencyMs,
-      failureReason: this.latestSample.failureReason,
-      staleAfterSeconds: this.staleAfterSeconds,
-      lastChangeAt: this.lastChangeAt || this.latestSample.observedAt
-    };
+    return buildSnapshot(this.currentState, this.staleAfterSeconds, now);
   }
 
-  private findLastChangeAt(latest: StoredConnectionLog): number {
-    const recent = this.repository.getRecent(10_000);
+  private replay(
+    samples: PersistedMonitorSample[],
+    revisions: MonitorSensitivityRevision[]
+  ): {
+    state: ConfirmedMonitorState | null;
+    activeThresholds: ConfirmationThresholds;
+    transitions: Array<{
+      status: PersistedMonitorSample["status"];
+      effectiveAt: number;
+      confirmedAt: number;
+    }>;
+  } {
+    const currentSettings = this.settingsReader.getSettings();
+    let state: ConfirmedMonitorState | null = null;
+    let revisionIndex = 0;
+    let activeThresholds = revisions[0]
+      ? toThresholds(revisions[0])
+      : {
+          confirmDownAfter: currentSettings.confirmDownAfter,
+          confirmUpAfter: currentSettings.confirmUpAfter
+        };
+    const transitions: Array<{
+      status: PersistedMonitorSample["status"];
+      effectiveAt: number;
+      confirmedAt: number;
+    }> = [];
 
-    let lastChangeAt = latest.observedAt;
+    for (const sample of samples) {
+      while (
+        revisionIndex + 1 < revisions.length &&
+        revisions[revisionIndex + 1]!.effectiveAt <= sample.observedAt
+      ) {
+        revisionIndex += 1;
+        activeThresholds = toThresholds(revisions[revisionIndex]!);
 
-    for (const sample of recent) {
-      if (sample.status !== latest.status) {
-        break;
+        if (state) {
+          state = resetPendingState(state);
+        }
       }
 
-      lastChangeAt = sample.observedAt;
+      const result = advanceConfirmedState(state, sample, activeThresholds);
+      state = result.state;
+
+      if (result.transition) {
+        transitions.push(result.transition);
+      }
     }
 
-    return lastChangeAt;
+    const latestThresholds = {
+      confirmDownAfter: currentSettings.confirmDownAfter,
+      confirmUpAfter: currentSettings.confirmUpAfter
+    };
+
+    if (state && !thresholdsEqual(activeThresholds, latestThresholds)) {
+      state = resetPendingState(state);
+    }
+
+    return {
+      state,
+      activeThresholds: latestThresholds,
+      transitions
+    };
   }
 }

@@ -54,18 +54,13 @@ describe("GET /api/v1/incidents", () => {
         from: base,
         to: base + 20
       });
-      expect(body.incidents).toHaveLength(2);
+      expect(body.incidents).toHaveLength(1);
       expect(body.incidents[0]).toMatchObject({
         startedAt: base + 5,
-        lastObservedAt: base + 10,
-        resolvedAt: base + 15,
-        durationSeconds: 10,
-        status: "resolved"
-      });
-      expect(body.incidents[1]).toMatchObject({
-        startedAt: base + 20,
+        lastObservedAt: base + 20,
         resolvedAt: null,
-        durationSeconds: 5,
+        durationSeconds: 20,
+        sampleCount: 3,
         latestFailureReason: "icmp-unreachable",
         status: "ongoing"
       });

@@ -1,4 +1,3 @@
-import { ConnectionBadge } from "./connection-badge";
 import type { CurrentStatusSnapshot } from "../types/monitor";
 
 type StreamState = "connecting" | "live" | "reconnecting";
@@ -29,17 +28,6 @@ function formatRelativeTime(unixSeconds: number): string {
   return `${Math.floor(deltaSeconds / 86_400)}d ago`;
 }
 
-function getDiagnosis(snapshot: CurrentStatusSnapshot): string {
-  switch (snapshot.status) {
-    case "ok":
-      return "The external target is responding. There are no active incidents.";
-    case "down":
-      return "The external probe failed. A connectivity outage was recorded from this machine.";
-    case "stale":
-      return "No recent samples have arrived. Check the local monitor or the SSE connection.";
-  }
-}
-
 function getStreamLabel(streamState: StreamState): string {
   switch (streamState) {
     case "live":
@@ -54,11 +42,11 @@ function getStreamLabel(streamState: StreamState): string {
 function getHeadline(status: CurrentStatusSnapshot["status"]): string {
   switch (status) {
     case "ok":
-      return "OK: OPERATIONAL";
+      return "OK";
     case "down":
-      return "DOWN: INCIDENT";
+      return "DOWN";
     case "stale":
-      return "STALE: NO DATA";
+      return "NO DATA";
   }
 }
 
@@ -78,7 +66,7 @@ export function StatusCard({
       <section className="status-hero status-hero--pending">
         <div className="status-hero__primary">
           <span className="status-hero__label">Current state</span>
-          <h1>WAITING: INITIAL SAMPLE</h1>
+          <h1>NO DATA</h1>
           <p className="status-hero__meta mono">System stability: --</p>
         </div>
         <dl className="status-hero__secondary">
@@ -106,15 +94,9 @@ export function StatusCard({
   return (
     <section className={`status-hero status-hero--${snapshot.status}`}>
       <div className="status-hero__primary">
-        <div className="status-hero__headline">
-          <div>
-            <span className="status-hero__label">Current state</span>
-            <h1>{getHeadline(snapshot.status)}</h1>
-          </div>
-          <ConnectionBadge status={snapshot.status} />
-        </div>
+        <span className="status-hero__label">Current state</span>
+        <h1>{getHeadline(snapshot.status)}</h1>
         <p className="status-hero__meta mono">System stability: {operationalRate}</p>
-        <p className="status-hero__copy">{getDiagnosis(snapshot)}</p>
       </div>
       <dl className="status-hero__secondary">
         <div className="status-hero__metric">

@@ -1,16 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { MonitorSample, RangePreset } from "../types/monitor";
+import type { RangePreset, TimelineSegment } from "../types/monitor";
 import { getRangeCopy } from "../utils/range";
-
-function getSampleTone(status: MonitorSample["status"]): string {
-  switch (status) {
-    case "ok":
-      return "ok";
-    case "down":
-      return "down";
-  }
-}
 
 const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
@@ -25,8 +16,19 @@ const tickFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 interface TimelineTooltipState {
-  sample: MonitorSample;
+  segment: TimelineSegment;
   left: number;
+}
+
+function getSegmentTone(status: TimelineSegment["status"]): string {
+  switch (status) {
+    case "ok":
+      return "ok";
+    case "down":
+      return "down";
+    case "no_data":
+      return "no-data";
+  }
 }
 
 function formatDateTime(unixSeconds: number): string {
@@ -35,6 +37,24 @@ function formatDateTime(unixSeconds: number): string {
 
 function formatTick(unixSeconds: number): string {
   return tickFormatter.format(new Date(unixSeconds * 1000));
+}
+
+function formatDuration(durationSeconds: number): string {
+  if (durationSeconds < 60) {
+    return `${durationSeconds}s`;
+  }
+
+  if (durationSeconds < 3600) {
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+
+    return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  }
+
+  const hours = Math.floor(durationSeconds / 3600);
+  const minutes = Math.floor((durationSeconds % 3600) / 60);
+
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
 }
 
 function scrollStripToEnd(strip: HTMLDivElement, behavior: ScrollBehavior): void {
@@ -50,16 +70,16 @@ function scrollStripToEnd(strip: HTMLDivElement, behavior: ScrollBehavior): void
 }
 
 export function TimelineHeatmap({
-  samples,
-  selectedSample,
-  onSelectSample,
+  segments,
+  selectedSegment,
+  onSelectSegment,
   range,
   liveMode,
   onLiveModeChange
 }: {
-  samples: MonitorSample[];
-  selectedSample: MonitorSample | null;
-  onSelectSample: (sample: MonitorSample) => void;
+  segments: TimelineSegment[];
+  selectedSegment: TimelineSegment | null;
+  onSelectSegment: (segment: TimelineSegment) => void;
   range: RangePreset;
   liveMode: boolean;
   onLiveModeChange: (nextValue: boolean) => void;
@@ -86,13 +106,13 @@ export function TimelineHeatmap({
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [samples, liveMode]);
+  }, [segments, liveMode]);
 
   useEffect(() => {
     setTooltip(null);
-  }, [samples.length, liveMode]);
+  }, [segments.length, liveMode]);
 
-  function showTooltip(sample: MonitorSample, target: HTMLButtonElement): void {
+  function showTooltip(segment: TimelineSegment, target: HTMLButtonElement): void {
     const strip = stripRef.current;
     const viewport = stripViewportRef.current;
 
@@ -105,7 +125,7 @@ export function TimelineHeatmap({
     const maximum = Math.max(horizontalPadding, viewport.clientWidth - horizontalPadding);
 
     setTooltip({
-      sample,
+      segment,
       left: Math.min(Math.max(rawLeft, horizontalPadding), maximum)
     });
   }
@@ -123,22 +143,32 @@ export function TimelineHeatmap({
 
     if (remaining > 24 && liveMode) {
       onLiveModeChange(false);
-      return;
     }
   }
+
+  const rangeStart = segments[0]?.visibleStart ?? 0;
+  const rangeEnd = segments[segments.length - 1]?.visibleEnd ?? 0;
+  const midpoint = rangeStart + Math.floor((rangeEnd - rangeStart) / 2);
+  const totalDuration = Math.max(
+    1,
+    segments.reduce(
+      (accumulator, segment) => accumulator + Math.max(1, segment.visibleEnd - segment.visibleStart),
+      0
+    )
+  );
 
   return (
     <section className="timeline-panel">
       <div className="timeline-panel__header">
-        <h3 className="timeline-panel__title">Connectivity Heatmap ({getRangeCopy(range)})</h3>
+        <h3 className="timeline-panel__title">Connectivity Timeline ({getRangeCopy(range)})</h3>
         <span className="timeline-panel__count mono">
-          Samples: {samples.length.toLocaleString("en-US")}
+          Segments: {segments.length.toLocaleString("en-US")}
         </span>
       </div>
-      {samples.length === 0 ? (
+      {segments.length === 0 ? (
         <div className="timeline-empty">
           <p className="eyebrow">No telemetry</p>
-          <h3>No samples in the selected range</h3>
+          <h3>No segments in the selected range</h3>
           <p className="timeline__summary">
             Adjust the time window or refresh the range to load the available history again.
           </p>
@@ -146,58 +176,75 @@ export function TimelineHeatmap({
       ) : (
         <>
           <div className="timeline-axis">
-            <span className="mono">{formatTick(samples[0]?.observedAt ?? 0)}</span>
-            <span className="mono">{formatTick(samples[Math.floor(samples.length / 2)]?.observedAt ?? 0)}</span>
-            <span className="mono">{formatTick(samples[samples.length - 1]?.observedAt ?? 0)}</span>
+            <span className="mono">{formatTick(rangeStart)}</span>
+            <span className="mono">{formatTick(midpoint)}</span>
+            <span className="mono">{formatTick(rangeEnd)}</span>
           </div>
           <div ref={stripViewportRef} className="timeline-strip-shell">
             <div
               ref={stripRef}
-              className="timeline-strip"
+              className="timeline-strip timeline-strip--segments"
               role="list"
-              aria-label="Connectivity history"
+              aria-label="Connectivity timeline"
               data-live-mode={liveMode ? "on" : "off"}
               onScroll={handleTimelineScroll}
             >
-              {samples.map((sample) => (
-                <button
-                  key={sample.observedAt}
-                  type="button"
-                  role="listitem"
-                  aria-pressed={selectedSample?.observedAt === sample.observedAt}
-                  className={`timeline-strip__cell timeline-strip__cell--${getSampleTone(sample.status)}${selectedSample?.observedAt === sample.observedAt ? " is-selected" : ""}`}
-                  onMouseEnter={(event) => {
-                    onSelectSample(sample);
-                    showTooltip(sample, event.currentTarget);
-                  }}
-                  onMouseLeave={() => setTooltip(null)}
-                  onFocus={(event) => {
-                    onSelectSample(sample);
-                    showTooltip(sample, event.currentTarget);
-                  }}
-                  onBlur={() => setTooltip(null)}
-                  onClick={(event) => {
-                    onSelectSample(sample);
-                    showTooltip(sample, event.currentTarget);
-                  }}
-                >
-                  <span className="sr-only">{`${formatDateTime(sample.observedAt)} ${sample.status}`}</span>
-                </button>
-              ))}
+              {segments.map((segment) => {
+                const flexWeight = Math.max(1, segment.visibleEnd - segment.visibleStart);
+                const durationRatio = (flexWeight / totalDuration) * 100;
+
+                return (
+                  <button
+                    key={`${segment.status}-${segment.startedAt}`}
+                    type="button"
+                    role="listitem"
+                    aria-pressed={
+                      selectedSegment?.startedAt === segment.startedAt &&
+                      selectedSegment.status === segment.status
+                    }
+                    className={`timeline-segment timeline-segment--${getSegmentTone(segment.status)}${selectedSegment?.startedAt === segment.startedAt && selectedSegment.status === segment.status ? " is-selected" : ""}`}
+                    style={{
+                      flexGrow: flexWeight,
+                      flexBasis: 0,
+                      minWidth: durationRatio < 4 ? "22px" : "36px"
+                    }}
+                    onMouseEnter={(event) => {
+                      onSelectSegment(segment);
+                      showTooltip(segment, event.currentTarget);
+                    }}
+                    onMouseLeave={() => setTooltip(null)}
+                    onFocus={(event) => {
+                      onSelectSegment(segment);
+                      showTooltip(segment, event.currentTarget);
+                    }}
+                    onBlur={() => setTooltip(null)}
+                    onClick={(event) => {
+                      onSelectSegment(segment);
+                      showTooltip(segment, event.currentTarget);
+                    }}
+                  >
+                    <span className="timeline-segment__label sr-only">
+                      {`${formatDateTime(segment.visibleStart)} ${segment.status}`}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             {tooltip ? (
               <div className="timeline-tooltip" style={{ left: `${tooltip.left}px` }} role="status">
-                <p className="timeline-tooltip__status">
-                  STATUS: {tooltip.sample.status === "ok" ? "OK" : "DOWN"}
+                <p
+                  className={`timeline-tooltip__status timeline-tooltip__status--${getSegmentTone(tooltip.segment.status)}`}
+                >
+                  STATUS: {tooltip.segment.status === "ok" ? "OK" : tooltip.segment.status === "down" ? "DOWN" : "NO DATA"}
                 </p>
-                <p className="timeline-tooltip__time mono">{formatDateTime(tooltip.sample.observedAt)}</p>
+                <p className="timeline-tooltip__time mono">
+                  {formatDateTime(tooltip.segment.visibleStart)} to {formatDateTime(tooltip.segment.visibleEnd)}
+                </p>
                 <p className="timeline-tooltip__meta mono">
-                  {tooltip.sample.externalLatencyMs === null
-                    ? "Latency unavailable"
-                    : `Latency ${tooltip.sample.externalLatencyMs} ms`}
+                  Duration {formatDuration(Math.max(1, tooltip.segment.durationSeconds))}
                 </p>
                 <p className="timeline-tooltip__meta">
-                  {tooltip.sample.failureReason ?? "PING Successful"}
+                  {tooltip.segment.sampleCount} raw samples in segment
                 </p>
               </div>
             ) : null}

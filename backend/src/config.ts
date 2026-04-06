@@ -17,6 +17,8 @@ export interface AppConfig {
     pingBinary: string;
     heartbeatSeconds: number;
     roundRobinEnabled: boolean;
+    confirmDownAfter: number;
+    confirmUpAfter: number;
   };
 }
 
@@ -90,7 +92,9 @@ export function loadConfig(): AppConfig {
       pingTimeoutMs: parsePositiveInteger(process.env.MONITOR_PING_TIMEOUT_MS, 3000),
       pingBinary: process.env.MONITOR_PING_BINARY?.trim() || "ping",
       heartbeatSeconds: 15,
-      roundRobinEnabled: parseBoolean(process.env.MONITOR_ROUND_ROBIN_ENABLED, false)
+      roundRobinEnabled: parseBoolean(process.env.MONITOR_ROUND_ROBIN_ENABLED, false),
+      confirmDownAfter: parsePositiveInteger(process.env.MONITOR_CONFIRM_DOWN_AFTER, 2),
+      confirmUpAfter: parsePositiveInteger(process.env.MONITOR_CONFIRM_UP_AFTER, 2)
     }
   };
 }

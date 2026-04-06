@@ -22,7 +22,9 @@ describe("GET /api/v1/bootstrap", () => {
       retentionDays: 30,
       sampleIntervalSeconds: 5,
       monitorSettings: {
-        roundRobinEnabled: false
+        roundRobinEnabled: false,
+        confirmDownAfter: 2,
+        confirmUpAfter: 2
       },
       current: {
         status: "ok",
@@ -50,9 +52,13 @@ describe("GET /api/v1/bootstrap", () => {
       ])
     );
     expect(body.history).toHaveLength(1);
+    expect(body.historySegments).toHaveLength(1);
     expect(body.history[0]).toMatchObject({
       status: "ok",
       externalTarget: "1.1.1.1"
+    });
+    expect(body.historySegments[0]).toMatchObject({
+      status: "ok"
     });
   });
 });

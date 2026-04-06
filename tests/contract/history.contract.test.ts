@@ -1,11 +1,15 @@
 import request from "supertest";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import type { HistoryResponse } from "../../backend/src/types/api";
+import type { HistoryResponse, TimelineSegmentsResponse } from "../../backend/src/types/api";
 import { createCycle, createTestHarness } from "../helpers/test-harness";
 
 describe("GET /api/v1/history", () => {
-  const harness = createTestHarness();
+  let harness = createTestHarness();
+
+  beforeEach(() => {
+    harness = createTestHarness();
+  });
 
   afterEach(() => {
     harness.close();
@@ -39,6 +43,53 @@ describe("GET /api/v1/history", () => {
     expect(body.samples[1]).toMatchObject({
       status: "down",
       failureReason: "timeout"
+    });
+  });
+
+  it("returns grouped timeline segments for a requested range", async () => {
+    const base = Math.floor(Date.now() / 1000) - 600;
+
+    harness.monitorService.processCycle(createCycle({ observedAt: base }));
+    harness.monitorService.processCycle(
+      createCycle({
+        observedAt: base + 5,
+        externalProbe: {
+          target: "1.1.1.1",
+          ok: false,
+          latencyMs: null,
+          failureReason: "timeout"
+        }
+      })
+    );
+    harness.monitorService.processCycle(
+      createCycle({
+        observedAt: base + 10,
+        externalProbe: {
+          target: "1.1.1.1",
+          ok: false,
+          latencyMs: null,
+          failureReason: "timeout"
+        }
+      })
+    );
+
+    const response = await request(harness.app).get(
+      `/api/v1/history/segments?from=${base}&to=${base + 10}`
+    );
+    const body = response.body as unknown as TimelineSegmentsResponse;
+
+    expect(response.status).toBe(200);
+    expect(body.segments).toHaveLength(2);
+    expect(body.segments[0]).toMatchObject({
+      status: "ok",
+      startedAt: base,
+      endedAt: base + 5
+    });
+    expect(body.segments[1]).toMatchObject({
+      status: "down",
+      startedAt: base + 5,
+      endedAt: null,
+      latestFailureReason: "timeout"
     });
   });
 });

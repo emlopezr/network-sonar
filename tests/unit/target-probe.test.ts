@@ -49,6 +49,61 @@ describe("runProbeSequence", () => {
     expect(probeRunner).toHaveBeenCalledTimes(2);
   });
 
+  it("probes all configured providers in parallel and keeps the configured priority order", async () => {
+    const probeRunner = vi.fn((_: string, target: string) => {
+      if (target === "1.1.1.1") {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              target,
+              ok: false,
+              latencyMs: null,
+              failureReason: "timeout"
+            });
+          }, 40);
+        });
+      }
+
+      if (target === "8.8.8.8") {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              target,
+              ok: true,
+              latencyMs: 18,
+              failureReason: null
+            });
+          }, 5);
+        });
+      }
+
+      return Promise.resolve({
+        target,
+        ok: true,
+        latencyMs: 10,
+        failureReason: null
+      });
+    });
+
+    const startedAt = Date.now();
+    const result = await runProbeSequence(
+      "ping",
+      ["1.1.1.1", "8.8.8.8", "9.9.9.9"],
+      3000,
+      probeRunner
+    );
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(result.externalTarget).toBe("8.8.8.8");
+    expect(result.externalProbe).toMatchObject({
+      target: "8.8.8.8",
+      ok: true,
+      latencyMs: 18
+    });
+    expect(probeRunner).toHaveBeenCalledTimes(3);
+    expect(elapsedMs).toBeLessThan(80);
+  });
+
   it("marks the cycle as down only after every provider fails", async () => {
     const probeRunner = vi
       .fn()

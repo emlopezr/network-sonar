@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { HistoryService } from "../../backend/src/services/history-service";
-import type { PersistedMonitorSample } from "../../backend/src/types/monitor";
-import type { ConnectionLogStore, StoredConnectionLog } from "../../backend/src/types/storage";
+import type {
+  MonitorStateTransition,
+  PersistedMonitorSample
+} from "../../backend/src/types/monitor";
+import type {
+  ConnectionLogStore,
+  StoredConnectionLog,
+  TransitionStore
+} from "../../backend/src/types/storage";
 
 function createStoredSample(
   observedAt: number,
@@ -28,8 +35,42 @@ function createRepository(samples: StoredConnectionLog[]): ConnectionLogStore {
     },
     getLatest: () => samples[samples.length - 1] ?? null,
     getRecent: (limit) => samples.slice(Math.max(0, samples.length - limit)),
-    getRange: () => samples,
+    getRange: (from, to) =>
+      samples.filter((sample) => sample.observedAt >= from && sample.observedAt <= to),
+    getAll: () => samples,
     purgeOlderThan: () => 0
+  };
+}
+
+function createTransition(
+  status: MonitorStateTransition["status"],
+  effectiveAt: number,
+  confirmedAt = effectiveAt
+): MonitorStateTransition {
+  return {
+    id: effectiveAt,
+    status,
+    effectiveAt,
+    confirmedAt,
+    createdAt: confirmedAt
+  };
+}
+
+function createTransitionStore(transitions: MonitorStateTransition[]): TransitionStore {
+  return {
+    insert: () => {
+      throw new Error("insert should not be called in history service unit tests");
+    },
+    listRange: (from, to) =>
+      transitions.filter((transition) => transition.effectiveAt >= from && transition.effectiveAt <= to),
+    getLatestBeforeOrAt: (at) =>
+      [...transitions]
+        .filter((transition) => transition.effectiveAt <= at)
+        .sort((left, right) => right.effectiveAt - left.effectiveAt)[0] ?? null,
+    getAll: () => transitions,
+    replaceAll: () => {
+      throw new Error("replaceAll should not be called in history service unit tests");
+    }
   };
 }
 
@@ -41,6 +82,11 @@ describe("history service incidents", () => {
         createStoredSample(105, "down", "timeout"),
         createStoredSample(110, "down", "timeout"),
         createStoredSample(115, "ok")
+      ]),
+      createTransitionStore([
+        createTransition("ok", 100),
+        createTransition("down", 105, 110),
+        createTransition("ok", 115)
       ]),
       5
     );
@@ -66,6 +112,11 @@ describe("history service incidents", () => {
         createStoredSample(105, "ok"),
         createStoredSample(110, "down", "icmp-unreachable")
       ]),
+      createTransitionStore([
+        createTransition("down", 100),
+        createTransition("ok", 105),
+        createTransition("down", 110)
+      ]),
       5
     );
 
@@ -83,7 +134,11 @@ describe("history service incidents", () => {
   });
 
   it("keeps the minimum duration for a single-sample incident", () => {
-    const service = new HistoryService(createRepository([createStoredSample(200, "down", "timeout")]), 5);
+    const service = new HistoryService(
+      createRepository([createStoredSample(200, "down", "timeout")]),
+      createTransitionStore([createTransition("down", 200)]),
+      5
+    );
 
     const incidents = service.getIncidents(200, 200);
 
@@ -98,6 +153,10 @@ describe("history service incidents", () => {
         createStoredSample(105, "down", "timeout"),
         createStoredSample(110, "down", "timeout")
       ]),
+      createTransitionStore([
+        createTransition("ok", 100),
+        createTransition("down", 105, 110)
+      ]),
       5
     );
 
@@ -107,6 +166,91 @@ describe("history service incidents", () => {
     expect(incidents[0]).toMatchObject({
       resolvedAt: null,
       status: "ongoing"
+    });
+  });
+});
+
+describe("history service timeline segments", () => {
+  it("compacts confirmed states into continuous segments", () => {
+    const service = new HistoryService(
+      createRepository([
+        createStoredSample(100, "ok"),
+        createStoredSample(105, "ok"),
+        createStoredSample(110, "down", "timeout"),
+        createStoredSample(115, "down", "timeout"),
+        createStoredSample(120, "ok")
+      ]),
+      createTransitionStore([
+        createTransition("ok", 100),
+        createTransition("down", 110),
+        createTransition("ok", 120)
+      ]),
+      5
+    );
+
+    const segments = service.getTimelineSegments(100, 125);
+
+    expect(segments).toHaveLength(3);
+    expect(segments[0]).toMatchObject({
+      status: "ok",
+      startedAt: 100,
+      endedAt: 110,
+      visibleStart: 100,
+      visibleEnd: 110,
+      sampleCount: 2
+    });
+    expect(segments[1]).toMatchObject({
+      status: "down",
+      startedAt: 110,
+      endedAt: 120,
+      visibleStart: 110,
+      visibleEnd: 120,
+      sampleCount: 2,
+      latestFailureReason: "timeout"
+    });
+    expect(segments[2]).toMatchObject({
+      status: "ok",
+      startedAt: 120,
+      endedAt: null,
+      visibleStart: 120,
+      visibleEnd: 125,
+      sampleCount: 1
+    });
+  });
+
+  it("clips segments to the requested range boundaries", () => {
+    const service = new HistoryService(
+      createRepository([
+        createStoredSample(100, "ok"),
+        createStoredSample(105, "ok"),
+        createStoredSample(110, "down", "timeout"),
+        createStoredSample(115, "down", "timeout")
+      ]),
+      createTransitionStore([
+        createTransition("ok", 100),
+        createTransition("down", 110)
+      ]),
+      5
+    );
+
+    const segments = service.getTimelineSegments(105, 112);
+
+    expect(segments).toHaveLength(2);
+    expect(segments[0]).toMatchObject({
+      status: "ok",
+      startedAt: 100,
+      visibleStart: 105,
+      visibleEnd: 110,
+      startedBeforeRange: true,
+      endsAfterRange: false
+    });
+    expect(segments[1]).toMatchObject({
+      status: "down",
+      startedAt: 110,
+      visibleStart: 110,
+      visibleEnd: 112,
+      startedBeforeRange: false,
+      endsAfterRange: true
     });
   });
 });

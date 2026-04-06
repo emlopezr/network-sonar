@@ -11,13 +11,17 @@ export function ProviderStrategyPanel({
   monitorSettings,
   providerStats,
   onToggleOpen,
-  onNavigate
+  onNavigate,
+  onToggleRoundRobin,
+  savingRoundRobin
 }: {
   isOpen: boolean;
   monitorSettings: MonitorSettings;
   providerStats: ProviderRuntimeStat[];
   onToggleOpen: () => void;
   onNavigate: (path: AppPath) => void;
+  onToggleRoundRobin: () => void;
+  savingRoundRobin: boolean;
 }) {
   const activeProviderStats = providerStats.filter(({ provider }) => provider.isEnabled);
   const activeProviderCount = activeProviderStats.length;
@@ -52,17 +56,36 @@ export function ProviderStrategyPanel({
             </div>
             <div className="provider-panel__actions">
               <div className="provider-panel__mode">
-                <span className="provider-panel__mode-label">Mode</span>
-                <span className="provider-panel__mode-value mono">
-                  {getMonitorModeLabel(monitorSettings.roundRobinEnabled)}
-                </span>
+                <div className="live-switch">
+                  <span className="provider-panel__mode-label">Round Robin</span>
+                  <button
+                    type="button"
+                    className={`live-switch__toggle${monitorSettings.roundRobinEnabled ? " is-active" : ""}`}
+                    aria-pressed={monitorSettings.roundRobinEnabled}
+                    aria-label="Toggle round robin providers"
+                    disabled={savingRoundRobin}
+                    onClick={onToggleRoundRobin}
+                  >
+                    <span className="live-switch__thumb" />
+                  </button>
+                  <span
+                    className={`live-switch__value mono${monitorSettings.roundRobinEnabled ? " is-active" : ""}`}
+                  >
+                    {savingRoundRobin
+                      ? "SAVING"
+                      : monitorSettings.roundRobinEnabled
+                        ? "ON"
+                        : "OFF"}
+                  </span>
+                </div>
               </div>
+              <span className="control-bar__divider" aria-hidden="true" />
               <button
                 type="button"
                 className="provider-panel__link"
                 onClick={() => onNavigate("/providers")}
               >
-                Manage providers
+                Open configuration
               </button>
             </div>
           </div>
@@ -110,7 +133,7 @@ export function ProviderStrategyPanel({
             <div className="provider-panel__empty">
               <p className="eyebrow">No active providers</p>
               <p className="provider-panel__empty-copy">
-                Enable at least one provider from the management page to resume probing.
+                Enable at least one provider from the configuration page to resume probing.
               </p>
             </div>
           )}

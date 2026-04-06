@@ -37,6 +37,8 @@ describe("GET /api/v1/events", () => {
     );
 
     const nextChunk = await readSseChunk(stream.reader);
+    expect(nextChunk).toContain("event: snapshot");
+    expect(nextChunk).toContain("\"status\":\"ok\"");
     expect(nextChunk).toContain("event: sample");
     expect(nextChunk).toContain("\"status\":\"down\"");
 

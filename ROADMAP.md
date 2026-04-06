@@ -32,27 +32,43 @@ La 1.0.0 debe ser:
 ### Ya existe
 
 - monitoreo periódico cada 5 segundos
+- sondeo paralelo de providers dentro de cada ciclo para no degradar la cadencia cuando todos fallan
 - persistencia en SQLite
 - backend Express + frontend React
 - SSE en vivo
 - historial en UI
 - vista de incidentes
 - gestión de providers
+- sensibilidad configurable para confirmación `ok -> down` y `down -> ok`
+- estado confirmado e incidentes derivados de transiciones confirmadas
 - base visual razonablemente buena
 
 ### Aún no está consolidado
 
 - la timeline larga se vuelve pesada por renderizar demasiadas muestras
-- faltan umbrales de confirmación para reducir falsos positivos
 - no existe timeline segmentada
 - no existe `NO DATA` como bloque explícito
 - no existe control claro `on/off` del monitor
 - falta packaging oficial por Docker
 - falta alinear seguridad, docs, UI y refactors de base
 
+## Consideraciones de diseño ya cerradas
+
+- Las muestras crudas se siguen guardando siempre; no se reemplazan por estado derivado.
+- El estado actual visible y los incidentes dependen del estado confirmado, no de cada muestra individual.
+- Una caída se confirma con `N` fallos consecutivos y una recuperación con `M` éxitos consecutivos.
+- Para 1.0, `N` y `M` ya son configurables desde settings y se aplican sólo hacia adelante; no reinterpretan el historial pasado.
+- Las transiciones confirmadas son retroactivas al inicio de la racha candidata: el incidente empieza en el primer fallo de la racha confirmada y termina en el primer éxito de la racha confirmada.
+- Un microcorte que sí alcanza la confirmación mínima cuenta como incidente real.
+- `STALE` significa falta de actividad reciente del monitor/stream, no una caída confirmada.
+- La cadencia objetivo sigue siendo una muestra cada 5 segundos; si todos los providers fallan, el ciclo no debe degradarse por probar targets en serie.
+- Historias futuras de segmentos, uptime, `NO DATA` e incidentes deben derivarse de transiciones confirmadas más muestras crudas, no redefinir estas reglas.
+
 ## Roadmap por historias/épicas
 
 ## 1. Modelo de estado y confirmación de incidentes
+
+Estado: `hecho`
 
 ### Historia / problema
 
@@ -67,32 +83,39 @@ Como usuario, quiero que la app no marque una caída por un único ping aislado 
 
 ### Decisiones de diseño ya tomadas
 
-- una caída se confirma con `2` fallos consecutivos
-- una recuperación se confirma con `2` éxitos consecutivos
+- una caída se confirma con `N` fallos consecutivos
+- una recuperación se confirma con `M` éxitos consecutivos
 - los cambios de segmento dependen del estado confirmado, no de cada muestra individual
 - se seguirán guardando las muestras crudas cada 5 segundos
+- las transiciones confirmadas se anclan retroactivamente a la primera muestra de la racha candidata
+- la sensibilidad es configurable desde settings y aplica sólo hacia adelante
+- un microcorte confirmado sí cuenta como incidente real
+- el sondeo de providers dentro del ciclo debe ejecutarse en paralelo para sostener la cadencia real de muestras
 
-### Qué falta implementar
+### Implementado
 
-- estado interno de “últimas muestras relevantes”
-- transición confirmada entre estados
-- actualización correcta del snapshot actual
-- cierre/apertura de incidente con esas transiciones
-- tests unitarios de transición
+- estado interno de confirmación y rachas pendientes
+- transición confirmada entre estados `ok` y `down`
+- snapshot actual basado en estado confirmado
+- apertura/cierre de incidentes desde transiciones confirmadas
+- settings persistidos para `confirmDownAfter` y `confirmUpAfter`
+- tests unitarios de transición y migraciones
 - tests de integración de incidentes largos y microcortes
+- corrección de `STALE` en UI para no tapar una caída mientras el stream sigue vivo
+- corrección de la cadencia real del monitor en caídas totales evitando probes secuenciales
 
 ### Dependencias
 
 - ninguna fuerte; esta historia es fundacional
 
-### Dudas por aclarar
+### Resultado para historias siguientes
 
-- si `2` y `2` quedan fijos para 1.0 o configurables
-- si un microcorte de 10 segundos debe contar como incidente real o como evento menor
+- existe una fuente de verdad de transiciones confirmadas
+- el historial crudo sigue disponible para detalle e inspección fina
+- incidentes, segmentos y métricas futuras deben montarse sobre estas reglas
 
 ### Qué puede posponerse
 
-- hacer configurable la sensibilidad desde UI
 - introducir más estados como `degraded`
 
 ### Criterio de cierre
@@ -102,6 +125,8 @@ Como usuario, quiero que la app no marque una caída por un único ping aislado 
 - los incidentes empiezan y terminan con reglas consistentes
 
 ## 2. Timeline segmentada por cambios de estado
+
+Estado: `hecho`
 
 ### Historia / problema
 
@@ -132,13 +157,19 @@ Como usuario, quiero ver bloques continuos de estado en vez de miles de puntos r
 
 ### Dependencias
 
-- depende de la historia 1 para tener estado confirmado consistente
+- depende de la historia 1 ya cerrada para tener transiciones confirmadas consistentes
 
 ### Dudas por aclarar
 
 - si la timeline larga mostrará sólo segmentos o si habrá modo detalle
 - si el backend devolverá siempre segmentos o según el rango pedido
 - si la selección de un segmento mostrará resumen o lista de muestras internas
+
+### Notas de consistencia
+
+- los segmentos deben derivarse de `monitor_state_transitions` y completar detalle con muestras crudas sólo cuando haga falta
+- no usar cambios por muestra individual para abrir/cerrar bloques principales
+- la duración visual debe respetar el anclaje retroactivo ya definido en historia 1
 
 ### Trabajo diferido
 
@@ -181,11 +212,17 @@ Como usuario, quiero ver cuándo no hubo medición, para no confundir ausencia d
 ### Dependencias
 
 - depende de la historia 2 si `NO DATA` también se expresa como segmento
+- debe respetar la semántica ya cerrada: `STALE` no sustituye `DOWN`, y `NO DATA` no debe confundirse con una caída confirmada
 
 ### Dudas por aclarar
 
 - umbral exacto para considerar un gap como `NO DATA`
 - si habrá diferencia visual entre `NO DATA por pausa voluntaria` y `NO DATA por app apagada`
+
+### Notas de consistencia
+
+- los gaps deben inferirse por ausencia de muestras/transiciones, no por reinterpretar incidentes
+- un incidente confirmado puede coexistir con muestras espaciadas; `NO DATA` debe reservarse para ausencia real de medición
 
 ### Trabajo diferido
 
@@ -226,6 +263,11 @@ Como usuario, quiero poder pausar o reanudar el monitoreo sin cerrar la app, par
 ### Dependencias
 
 - depende parcialmente de la historia 3 para cómo se ve la pausa en la timeline
+
+### Notas de consistencia
+
+- pausar el monitor debe producir ausencia real de muestras nuevas
+- la pausa no debe cerrar incidentes retroactivamente ni generar `ok` sintéticos
 
 ### Dudas por aclarar
 
@@ -272,7 +314,12 @@ Como usuario, quiero entender la estabilidad general de mi conexión sin tener q
 
 ### Dependencias
 
-- depende de la historia 1 para que los incidentes estén bien definidos
+- depende de la historia 1 ya cerrada para que incidentes y “última conectividad confirmada” sean consistentes
+
+### Notas de consistencia
+
+- uptime/downtime deben salir de transiciones confirmadas, no del ratio bruto de muestras `ok/down`
+- si se expone una métrica por rango, debe dejar claro cómo trata `NO DATA`
 
 ### Dudas por aclarar
 
@@ -312,7 +359,12 @@ Como usuario, quiero exportar datos para guardarlos o revisarlos fuera de la app
 
 ### Dependencias
 
-- conviene hacerlo después de definir el modelo estable de historial
+- conviene hacerlo después de definir el modelo estable de historial y segmentos
+
+### Notas de consistencia
+
+- export JSON/CSV debe poder distinguir entre muestras crudas, incidentes confirmados y futuros segmentos
+- no exportar incidentes recalculados con umbrales actuales si pertenecen a revisiones históricas distintas
 
 ### Dudas por aclarar
 
@@ -406,6 +458,11 @@ Como usuario, quiero una interfaz clara, consistente y rápida, que se sienta co
 
 - depende parcialmente de las historias 2 y 3, porque la timeline cambiará
 
+### Notas de consistencia
+
+- la UI debe distinguir visualmente `DOWN`, `STALE` y futuro `NO DATA` sin solaparlos semánticamente
+- cualquier copy sobre incidente actual debe hablar de conectividad confirmada, no de una muestra aislada
+
 ### Dudas por aclarar
 
 - si la timeline tendrá modo detalle adicional
@@ -445,7 +502,7 @@ Como mantenedor, quiero una base de código más limpia y menos duplicada, para 
 - compartir formateadores y helpers
 - revisar modelo de historial y contratos
 - limpiar artefactos `.vite`
-- dejar `lint` en verde
+- dejar `lint` en verde sin depender de artefactos generados
 - mejorar migraciones
 
 ### Dependencias
@@ -561,4 +618,3 @@ La clave de esta 1.0.0 no es añadir muchas cosas. Es cerrar bien unas pocas:
 - instalación simple
 - UI sobria
 - seguridad por defecto
-

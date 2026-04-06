@@ -1,4 +1,10 @@
-import type { CurrentStatusSnapshot, PersistedMonitorSample } from "./monitor";
+import type {
+  ConfirmationThresholds,
+  CurrentStatusSnapshot,
+  MonitorSensitivityRevision,
+  MonitorStateTransition,
+  PersistedMonitorSample
+} from "./monitor";
 
 export interface StoredConnectionLog extends PersistedMonitorSample {
   id: number;
@@ -10,7 +16,25 @@ export interface ConnectionLogStore {
   getLatest(): StoredConnectionLog | null;
   getRecent(limit: number): StoredConnectionLog[];
   getRange(from: number, to: number): StoredConnectionLog[];
+  getAll(): StoredConnectionLog[];
   purgeOlderThan(cutoffUnixSeconds: number): number;
+}
+
+export interface TransitionStore {
+  insert(transition: Omit<MonitorStateTransition, "id" | "createdAt">): MonitorStateTransition;
+  listRange(from: number, to: number): MonitorStateTransition[];
+  getLatestBeforeOrAt(at: number): MonitorStateTransition | null;
+  getAll(): MonitorStateTransition[];
+  replaceAll(transitions: Omit<MonitorStateTransition, "id" | "createdAt">[]): void;
+}
+
+export interface MonitorSettingsStore extends ConfirmationThresholds {
+  roundRobinEnabled: boolean;
+}
+
+export interface MonitorSettingsStoreReader {
+  getSettings(): MonitorSettingsStore;
+  listSensitivityRevisions(): MonitorSensitivityRevision[];
 }
 
 export interface MonitorReadModel {

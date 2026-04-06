@@ -1,9 +1,13 @@
 import type {
+  ConfirmationThresholds
+} from "../types/monitor";
+import type {
   CreateMonitorProviderRequest,
   MonitorProviderRecord,
   MonitorProviderSeed,
   MonitorSettings,
   ReorderMonitorProvidersRequest,
+  UpdateMonitorSettingsRequest,
   UpdateMonitorProviderRequest
 } from "../types/api";
 import type {
@@ -58,25 +62,61 @@ export class MonitorSettingsService {
     private readonly eventBus: MonitorEventBus,
     private readonly initialTargets: string[],
     private readonly initialRoundRobinEnabled: boolean,
+    private readonly initialThresholds: ConfirmationThresholds,
     private readonly availableProviders: MonitorProviderSeed[] = monitorProviderCatalog
   ) {}
 
   public initialize(): void {
     this.repository.initialize(
       this.initialRoundRobinEnabled,
+      this.initialThresholds,
       this.buildDefaultBootstrap()
     );
   }
 
   public getSettings(): MonitorSettings {
+    const settings = this.repository.getSettings();
+
     return {
-      roundRobinEnabled: this.repository.getRoundRobinEnabled(),
+      roundRobinEnabled: settings.roundRobinEnabled,
+      confirmDownAfter: settings.confirmDownAfter,
+      confirmUpAfter: settings.confirmUpAfter,
       providers: this.repository.listProviders()
     };
   }
 
-  public updateRoundRobinEnabled(roundRobinEnabled: boolean): MonitorSettings {
-    this.repository.updateRoundRobinEnabled(roundRobinEnabled);
+  public getThresholds(): ConfirmationThresholds {
+    const settings = this.repository.getSettings();
+
+    return {
+      confirmDownAfter: settings.confirmDownAfter,
+      confirmUpAfter: settings.confirmUpAfter
+    };
+  }
+
+  public updateSettings(
+    patch: UpdateMonitorSettingsRequest,
+    effectiveAt = Math.floor(Date.now() / 1000)
+  ): MonitorSettings {
+    const current = this.repository.getSettings();
+    const nextSettings = {
+      roundRobinEnabled: patch.roundRobinEnabled ?? current.roundRobinEnabled,
+      confirmDownAfter: patch.confirmDownAfter ?? current.confirmDownAfter,
+      confirmUpAfter: patch.confirmUpAfter ?? current.confirmUpAfter
+    };
+
+    this.repository.updateSettings(nextSettings);
+
+    if (
+      nextSettings.confirmDownAfter !== current.confirmDownAfter ||
+      nextSettings.confirmUpAfter !== current.confirmUpAfter
+    ) {
+      this.repository.addSensitivityRevision(effectiveAt, {
+        confirmDownAfter: nextSettings.confirmDownAfter,
+        confirmUpAfter: nextSettings.confirmUpAfter
+      });
+    }
+
     return this.publishAndReturnSettings();
   }
 

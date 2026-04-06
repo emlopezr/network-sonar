@@ -59,18 +59,9 @@ export function IncidentDetailPanel({ incident }: { incident: OutageIncident | n
     <section className="incident-detail" aria-live="polite">
       <div className="incident-detail__header">
         <p className="eyebrow">Details</p>
-        <div className="incident-detail__headline">
-          <h2>{getStatusLabel(incident.status)}</h2>
-          <span className={`incident-detail__status incident-detail__status--${incident.status}`}>
-            {getStatusLabel(incident.status)}
-          </span>
-        </div>
-        <p className="incident-detail__copy">
-          {formatIncidentReason(
-            incident.latestFailureReason,
-            "No stored error detail is available for this outage."
-          )}
-        </p>
+        <span className={`incident-detail__status incident-detail__status--${incident.status}`}>
+          {getStatusLabel(incident.status)}
+        </span>
       </div>
 
       <dl className="incident-detail__grid">
@@ -109,28 +100,6 @@ export function IncidentDetailPanel({ incident }: { incident: OutageIncident | n
           <dd className="mono">{formatIncidentReason(incident.latestFailureReason, "No detail")}</dd>
         </div>
       </dl>
-
-      <div className="incident-samples">
-        <div className="incident-samples__header">
-          <h3>Incident samples</h3>
-          <span className="mono">{incident.samples.length} events</span>
-        </div>
-        <ul className="incident-samples__list" role="list">
-          {incident.samples.map((sample) => (
-            <li key={sample.observedAt} className="incident-samples__item">
-              <div>
-                <p className="mono incident-samples__time">{formatDateTime(sample.observedAt)}</p>
-                <p className="incident-samples__reason">
-                  {formatIncidentReason(sample.failureReason, "No detail")}
-                </p>
-              </div>
-              <span className="mono incident-samples__latency">
-                {sample.externalLatencyMs === null ? "--" : `${sample.externalLatencyMs} ms`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
     </section>
   );
 }

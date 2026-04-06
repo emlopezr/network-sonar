@@ -7,8 +7,14 @@ import { Legend } from "../components/legend";
 import { ProviderStrategyPanel } from "../components/provider-strategy-panel";
 import { StatusCard } from "../components/status-card";
 import { TimelineHeatmap } from "../components/timeline-heatmap";
-import { fetchBootstrap, fetchHistory } from "../services/api-client";
+import {
+  fetchBootstrap,
+  fetchHistory,
+  fetchHistorySegments,
+  updateMonitorSettings
+} from "../services/api-client";
 import { connectStatusStream } from "../services/status-stream";
+import { shouldMarkSnapshotStale } from "../utils/current-snapshot";
 import { buildProviderRuntimeStats } from "../utils/provider-runtime";
 import { getRangeSeconds } from "../utils/range";
 import type {
@@ -16,13 +22,16 @@ import type {
   CurrentStatusSnapshot,
   MonitorSample,
   MonitorSettings,
-  RangePreset
+  RangePreset,
+  TimelineSegment
 } from "../types/monitor";
 import { rangePresets } from "../types/monitor";
 
 type StreamState = "connecting" | "live" | "reconnecting";
 const defaultMonitorSettings: MonitorSettings = {
   roundRobinEnabled: false,
+  confirmDownAfter: 2,
+  confirmUpAfter: 2,
   providers: []
 };
 
@@ -33,24 +42,9 @@ function normalizeMonitorSettings(settings: MonitorSettings | undefined): Monito
 
   return {
     roundRobinEnabled: settings.roundRobinEnabled,
+    confirmDownAfter: settings.confirmDownAfter,
+    confirmUpAfter: settings.confirmUpAfter,
     providers: settings.providers ?? []
-  };
-}
-
-function normalizeCurrentSnapshot(previous: CurrentStatusSnapshot | null, sample: MonitorSample): CurrentStatusSnapshot {
-  const staleAfterSeconds = previous?.staleAfterSeconds ?? 15;
-  const lastChangeAt =
-    !previous || previous.status !== sample.status ? sample.observedAt : previous.lastChangeAt;
-
-  return {
-    observedAt: sample.observedAt,
-    status: sample.status,
-    externalTarget: sample.externalTarget,
-    externalOk: sample.externalOk,
-    externalLatencyMs: sample.externalLatencyMs,
-    failureReason: sample.failureReason,
-    staleAfterSeconds,
-    lastChangeAt
   };
 }
 
@@ -63,6 +57,105 @@ function mergeHistorySample(
   return [...deduped, incoming]
     .filter((sample) => sample.observedAt >= minObservedAt)
     .sort((left, right) => left.observedAt - right.observedAt);
+}
+
+function trimTimelineSegments(
+  segments: TimelineSegment[],
+  minObservedAt: number
+): TimelineSegment[] {
+  return segments
+    .map((segment) => ({
+      ...segment,
+      visibleStart: Math.max(segment.visibleStart, minObservedAt),
+      durationSeconds: Math.max(0, segment.visibleEnd - Math.max(segment.visibleStart, minObservedAt)),
+      startedBeforeRange: segment.startedAt < minObservedAt
+    }))
+    .filter((segment) => segment.visibleEnd >= minObservedAt)
+    .sort((left, right) => left.visibleStart - right.visibleStart);
+}
+
+function mergeLiveSegment(
+  segments: TimelineSegment[],
+  snapshot: CurrentStatusSnapshot,
+  minObservedAt: number
+): TimelineSegment[] {
+  if (snapshot.status === "stale") {
+    return segments;
+  }
+
+  const nextSegments = trimTimelineSegments(segments, minObservedAt);
+  const latestSegment = nextSegments[nextSegments.length - 1] ?? null;
+  const segmentStart = snapshot.lastChangeAt;
+
+  if (
+    latestSegment &&
+    latestSegment.status === snapshot.status &&
+    latestSegment.startedAt === segmentStart
+  ) {
+    const updatedSegment: TimelineSegment = {
+      ...latestSegment,
+      visibleStart: Math.max(latestSegment.startedAt, minObservedAt),
+      visibleEnd: snapshot.observedAt,
+      durationSeconds: Math.max(0, snapshot.observedAt - Math.max(latestSegment.startedAt, minObservedAt)),
+      endedAt: null,
+      lastObservedAt: snapshot.observedAt,
+      latestFailureReason: snapshot.failureReason,
+      latestLatencyMs: snapshot.externalLatencyMs,
+      endsAfterRange: true
+    };
+
+    return [...nextSegments.slice(0, -1), updatedSegment];
+  }
+
+  const closedSegments = latestSegment
+    ? [
+        ...nextSegments.slice(0, -1),
+        {
+          ...latestSegment,
+          endedAt: segmentStart,
+          visibleEnd: Math.max(latestSegment.visibleStart, segmentStart),
+          durationSeconds: Math.max(0, Math.max(latestSegment.visibleStart, segmentStart) - latestSegment.visibleStart),
+          endsAfterRange: false
+        }
+      ].filter((segment) => segment.visibleEnd > segment.visibleStart)
+    : nextSegments;
+
+  return [
+    ...closedSegments,
+    {
+      status: snapshot.status,
+      startedAt: segmentStart,
+      endedAt: null,
+      visibleStart: Math.max(segmentStart, minObservedAt),
+      visibleEnd: snapshot.observedAt,
+      durationSeconds: Math.max(0, snapshot.observedAt - Math.max(segmentStart, minObservedAt)),
+      sampleCount: 0,
+      lastObservedAt: snapshot.observedAt,
+      latestFailureReason: snapshot.failureReason,
+      latestLatencyMs: snapshot.externalLatencyMs,
+      startedBeforeRange: segmentStart < minObservedAt,
+      endsAfterRange: true
+    }
+  ];
+}
+
+function getSegmentSelection(
+  segments: TimelineSegment[],
+  previous: TimelineSegment | null
+): TimelineSegment | null {
+  if (!previous) {
+    return segments[segments.length - 1] ?? null;
+  }
+
+  return (
+    segments.find(
+      (segment) =>
+        segment.startedAt === previous.startedAt &&
+        segment.status === previous.status
+    ) ??
+    segments[segments.length - 1] ??
+    null
+  );
 }
 
 function getOperationalRate(samples: MonitorSample[]): string {
@@ -93,7 +186,8 @@ export function Dashboard({
   const [range, setRange] = useState<RangePreset>("1h");
   const [current, setCurrent] = useState<CurrentStatusSnapshot | null>(null);
   const [history, setHistory] = useState<MonitorSample[]>([]);
-  const [selectedSample, setSelectedSample] = useState<MonitorSample | null>(null);
+  const [historySegments, setHistorySegments] = useState<TimelineSegment[]>([]);
+  const [selectedSegment, setSelectedSegment] = useState<TimelineSegment | null>(null);
   const [retentionDays, setRetentionDays] = useState(30);
   const [sampleIntervalSeconds, setSampleIntervalSeconds] = useState(5);
   const [streamState, setStreamState] = useState<StreamState>("connecting");
@@ -102,8 +196,9 @@ export function Dashboard({
   const [liveMode, setLiveMode] = useState(true);
   const [monitorSettings, setMonitorSettings] = useState<MonitorSettings>(defaultMonitorSettings);
   const [isProviderPanelOpen, setIsProviderPanelOpen] = useState(false);
+  const [savingRoundRobin, setSavingRoundRobin] = useState(false);
 
-  const deferredHistory = useDeferredValue(history);
+  const deferredSegments = useDeferredValue(historySegments);
   const rangeWindow = getRangeSeconds(range);
   const providerStats = buildProviderRuntimeStats(
     monitorSettings.providers,
@@ -127,7 +222,8 @@ export function Dashboard({
         startTransition(() => {
           setCurrent(payload.current);
           setHistory(payload.history);
-          setSelectedSample(payload.history[payload.history.length - 1] ?? null);
+          setHistorySegments(payload.historySegments);
+          setSelectedSegment(payload.historySegments[payload.historySegments.length - 1] ?? null);
           setRetentionDays(payload.retentionDays);
           setSampleIntervalSeconds(payload.sampleIntervalSeconds);
           setMonitorSettings(normalizeMonitorSettings(payload.monitorSettings));
@@ -151,17 +247,29 @@ export function Dashboard({
       onOpen: () => setStreamState("live"),
       onSnapshot: (payload) => {
         setCurrent(payload.current);
+        setHistorySegments((previous) => {
+          const nextSegments = mergeLiveSegment(
+            previous,
+            payload.current,
+            payload.current.observedAt - rangeWindow
+          );
+
+          setSelectedSegment((currentSelection) =>
+            getSegmentSelection(nextSegments, currentSelection)
+          );
+
+          return nextSegments;
+        });
         setLastEventAt(Math.floor(Date.now() / 1000));
       },
       onSettings: (payload) => {
         setMonitorSettings(normalizeMonitorSettings(payload.monitorSettings));
+        setSavingRoundRobin(false);
       },
       onSample: (payload) => {
-        setCurrent((previous) => normalizeCurrentSnapshot(previous, payload));
         setHistory((previous) =>
           mergeHistorySample(previous, payload, payload.observedAt - rangeWindow)
         );
-        setSelectedSample(payload);
         setLastEventAt(Math.floor(Date.now() / 1000));
       },
       onHeartbeat: (payload) => {
@@ -183,7 +291,7 @@ export function Dashboard({
         }
 
         const now = Math.floor(Date.now() / 1000);
-        if (now - previous.observedAt <= previous.staleAfterSeconds || previous.status === "stale") {
+        if (!shouldMarkSnapshotStale(previous, lastEventAt, now)) {
           return previous;
         }
 
@@ -197,19 +305,40 @@ export function Dashboard({
     return () => {
       window.clearInterval(timer);
     };
-  }, []);
+  }, [lastEventAt]);
 
   const from = Math.floor(Date.now() / 1000) - rangeWindow;
-  const selectedSampleIndex = selectedSample
-    ? history.findIndex((sample) => sample.observedAt === selectedSample.observedAt)
-    : -1;
 
   const refreshHistory = async (): Promise<void> => {
     const to = Math.floor(Date.now() / 1000);
-    const payload = await fetchHistory(from, to);
-    setHistory(payload.samples);
-    setSelectedSample(payload.samples[payload.samples.length - 1] ?? null);
+    const [historyPayload, segmentsPayload] = await Promise.all([
+      fetchHistory(from, to),
+      fetchHistorySegments(from, to)
+    ]);
+
+    setHistory(historyPayload.samples);
+    setHistorySegments(segmentsPayload.segments);
+    setSelectedSegment((previous) => getSegmentSelection(segmentsPayload.segments, previous));
   };
+
+  async function handleRoundRobinToggle(): Promise<void> {
+    try {
+      setSavingRoundRobin(true);
+      setError(null);
+      const updatedSettings = normalizeMonitorSettings(await updateMonitorSettings({
+        roundRobinEnabled: !monitorSettings.roundRobinEnabled
+      }));
+      setMonitorSettings(updatedSettings);
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Could not update the monitor settings."
+      );
+    } finally {
+      setSavingRoundRobin(false);
+    }
+  }
 
   return (
     <AppShell
@@ -273,21 +402,23 @@ export function Dashboard({
               className="control-bar__refresh mono"
               onClick={() => void refreshHistory()}
             >
-              Refresh range
+              Refresh
             </button>
           </div>
         </section>
 
         <TimelineHeatmap
-          samples={deferredHistory}
-          selectedSample={selectedSample}
-          onSelectSample={setSelectedSample}
+          segments={deferredSegments}
+          selectedSegment={selectedSegment}
+          onSelectSegment={(segment) => {
+            setSelectedSegment(segment);
+          }}
           range={range}
           liveMode={liveMode}
           onLiveModeChange={setLiveMode}
         />
 
-        <InspectorPanel sample={selectedSample} sampleIndex={selectedSampleIndex} />
+        <InspectorPanel segment={selectedSegment} />
 
         <ProviderStrategyPanel
           isOpen={isProviderPanelOpen}
@@ -295,6 +426,8 @@ export function Dashboard({
           providerStats={providerStats}
           onToggleOpen={() => setIsProviderPanelOpen((previous) => !previous)}
           onNavigate={onNavigate}
+          onToggleRoundRobin={() => void handleRoundRobinToggle()}
+          savingRoundRobin={savingRoundRobin}
         />
 
         <footer className="dashboard-footer">

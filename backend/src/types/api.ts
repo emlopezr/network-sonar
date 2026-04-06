@@ -3,6 +3,7 @@ import type { CurrentStatusSnapshot, PersistedMonitorSample } from "./monitor";
 export const rangePresets = ["1h", "6h", "24h", "7d", "30d"] as const;
 export type RangePreset = (typeof rangePresets)[number];
 export type OutageIncidentStatus = "ongoing" | "resolved";
+export type TimelineSegmentStatus = "ok" | "down" | "no_data";
 export type MonitorProviderCompany = "Cloudflare" | "Google" | "Quad9" | "OpenDNS";
 export type MonitorProviderKind = "default" | "custom";
 
@@ -26,12 +27,15 @@ export interface MonitorProviderRecord {
 
 export interface MonitorSettings {
   roundRobinEnabled: boolean;
+  confirmDownAfter: number;
+  confirmUpAfter: number;
   providers: MonitorProviderRecord[];
 }
 
 export interface BootstrapResponse {
   current: CurrentStatusSnapshot;
   history: PersistedMonitorSample[];
+  historySegments: TimelineSegment[];
   retentionDays: number;
   sampleIntervalSeconds: number;
   monitorSettings: MonitorSettings;
@@ -41,6 +45,27 @@ export interface HistoryResponse {
   from: number;
   to: number;
   samples: PersistedMonitorSample[];
+}
+
+export interface TimelineSegment {
+  status: TimelineSegmentStatus;
+  startedAt: number;
+  endedAt: number | null;
+  visibleStart: number;
+  visibleEnd: number;
+  durationSeconds: number;
+  sampleCount: number;
+  lastObservedAt: number | null;
+  latestFailureReason: string | null;
+  latestLatencyMs: number | null;
+  startedBeforeRange: boolean;
+  endsAfterRange: boolean;
+}
+
+export interface TimelineSegmentsResponse {
+  from: number;
+  to: number;
+  segments: TimelineSegment[];
 }
 
 export interface OutageIncident {
@@ -68,7 +93,9 @@ export interface HealthResponse {
 }
 
 export interface UpdateMonitorSettingsRequest {
-  roundRobinEnabled: boolean;
+  roundRobinEnabled?: boolean;
+  confirmDownAfter?: number;
+  confirmUpAfter?: number;
 }
 
 export interface CreateMonitorProviderRequest {

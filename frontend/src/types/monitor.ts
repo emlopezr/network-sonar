@@ -4,6 +4,7 @@ export type RangePreset = (typeof rangePresets)[number];
 export type MonitorStatus = "ok" | "down";
 export type SnapshotStatus = MonitorStatus | "stale";
 export type OutageIncidentStatus = "ongoing" | "resolved";
+export type TimelineSegmentStatus = MonitorStatus | "no_data";
 export type MonitorProviderCompany = "Cloudflare" | "Google" | "Quad9" | "OpenDNS";
 export type MonitorProviderKind = "default" | "custom";
 
@@ -21,6 +22,8 @@ export interface MonitorProviderRecord {
 
 export interface MonitorSettings {
   roundRobinEnabled: boolean;
+  confirmDownAfter: number;
+  confirmUpAfter: number;
   providers: MonitorProviderRecord[];
 }
 
@@ -47,6 +50,7 @@ export interface CurrentStatusSnapshot {
 export interface BootstrapResponse {
   current: CurrentStatusSnapshot;
   history: MonitorSample[];
+  historySegments: TimelineSegment[];
   retentionDays: number;
   sampleIntervalSeconds: number;
   monitorSettings: MonitorSettings;
@@ -56,6 +60,27 @@ export interface HistoryResponse {
   from: number;
   to: number;
   samples: MonitorSample[];
+}
+
+export interface TimelineSegment {
+  status: TimelineSegmentStatus;
+  startedAt: number;
+  endedAt: number | null;
+  visibleStart: number;
+  visibleEnd: number;
+  durationSeconds: number;
+  sampleCount: number;
+  lastObservedAt: number | null;
+  latestFailureReason: string | null;
+  latestLatencyMs: number | null;
+  startedBeforeRange: boolean;
+  endsAfterRange: boolean;
+}
+
+export interface TimelineSegmentsResponse {
+  from: number;
+  to: number;
+  segments: TimelineSegment[];
 }
 
 export interface OutageIncident {
@@ -86,7 +111,9 @@ export interface SettingsEventPayload {
 }
 
 export interface UpdateMonitorSettingsRequest {
-  roundRobinEnabled: boolean;
+  roundRobinEnabled?: boolean;
+  confirmDownAfter?: number;
+  confirmUpAfter?: number;
 }
 
 export interface CreateMonitorProviderRequest {

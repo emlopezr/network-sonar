@@ -2,6 +2,7 @@ import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { ConnectionLogRepository } from "./data/connection-log-repository";
 import { initializeDatabase } from "./data/db";
+import { MonitorStateTransitionRepository } from "./data/monitor-state-transition-repository";
 import { MonitorSettingsRepository } from "./data/monitor-settings-repository";
 import { PurgeService } from "./data/purge-service";
 import { MonitorScheduler } from "./network/monitor-scheduler";
@@ -15,25 +16,36 @@ export function main(): void {
   const config = loadConfig();
   const database = initializeDatabase(config.monitor.dbPath);
   const repository = new ConnectionLogRepository(database);
+  const transitionRepository = new MonitorStateTransitionRepository(database);
   const monitorSettingsRepository = new MonitorSettingsRepository(database);
   const currentStatusService = new CurrentStatusService(
     repository,
+    transitionRepository,
+    monitorSettingsRepository,
     config.monitor.staleAfterSeconds
   );
-  const historyService = new HistoryService(repository, config.monitor.intervalSeconds);
+  const historyService = new HistoryService(
+    repository,
+    transitionRepository,
+    config.monitor.intervalSeconds
+  );
   const eventBus = new MonitorEventBus();
   const monitorSettingsService = new MonitorSettingsService(
     monitorSettingsRepository,
     eventBus,
     config.monitor.targets,
-    config.monitor.roundRobinEnabled
+    config.monitor.roundRobinEnabled,
+    {
+      confirmDownAfter: config.monitor.confirmDownAfter,
+      confirmUpAfter: config.monitor.confirmUpAfter
+    }
   );
   monitorSettingsService.initialize();
   const monitorService = new MonitorService(
     repository,
     currentStatusService,
     eventBus,
-    historyService
+    monitorSettingsService
   );
   const purgeService = new PurgeService(repository, config.monitor.retentionDays);
   const scheduler = new MonitorScheduler(
