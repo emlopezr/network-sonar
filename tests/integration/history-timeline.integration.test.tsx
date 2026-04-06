@@ -92,7 +92,45 @@ describe("dashboard timeline", () => {
                 }
               ],
               retentionDays: 30,
-              sampleIntervalSeconds: 5
+              sampleIntervalSeconds: 5,
+              monitorSettings: {
+                roundRobinEnabled: false,
+                providers: [
+                  {
+                    id: 1,
+                    sortOrder: 0,
+                    target: "1.1.1.1",
+                    company: "Cloudflare",
+                    logoUrl: null,
+                    label: "Cloudflare Resolver 1.1.1.1",
+                    kind: "default",
+                    isDefault: true,
+                    isEnabled: true
+                  },
+                  {
+                    id: 2,
+                    sortOrder: 1,
+                    target: "8.8.8.8",
+                    company: "Google",
+                    logoUrl: null,
+                    label: "Google Public DNS 8.8.8.8",
+                    kind: "default",
+                    isDefault: true,
+                    isEnabled: true
+                  },
+                  {
+                    id: 3,
+                    sortOrder: 2,
+                    target: "9.9.9.9",
+                    company: "Quad9",
+                    logoUrl: null,
+                    label: "Quad9 Secure DNS 9.9.9.9",
+                    kind: "default",
+                    isDefault: true,
+                    isEnabled: false
+                  }
+                ]
+              }
             }),
             { status: 200 }
           )
@@ -109,8 +147,24 @@ describe("dashboard timeline", () => {
     render(<Dashboard />);
 
     await waitFor(() => {
-      expect(screen.getByText("2 muestras")).toBeInTheDocument();
+      expect(screen.getByText("NETWORK SONAR")).toBeInTheDocument();
+      expect(screen.getByText("Connectivity Heatmap (last 1 hour)")).toBeInTheDocument();
+      expect(screen.getByText("Samples: 2")).toBeInTheDocument();
+      expect(screen.getByText("Show provider summary")).toBeInTheDocument();
     });
+
+    expect(screen.getByRole("button", { name: "Refresh range" })).toBeInTheDocument();
+    expect(screen.getByText("Sample #2")).toBeInTheDocument();
+    expect(screen.getByText("timeout")).toBeInTheDocument();
+
+    act(() => {
+      screen.getByRole("button", { name: /show provider summary/i }).click();
+    });
+
+    expect(screen.getByText("Providers in rotation")).toBeInTheDocument();
+    expect(screen.getAllByText("Primary With Fallback").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("12 ms").length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Manage providers" })).toBeInTheDocument();
 
     const source = FakeEventSource.instances[0];
     expect(source).toBeDefined();
@@ -127,12 +181,16 @@ describe("dashboard timeline", () => {
         externalTarget: "1.1.1.1",
         externalOk: false,
         externalLatencyMs: null,
-        failureReason: "timeout"
+        failureReason: "icmp-unreachable"
       });
     });
 
     await waitFor(() => {
-      expect(screen.getByText("3 muestras")).toBeInTheDocument();
+      expect(screen.getByText("Samples: 3")).toBeInTheDocument();
+      expect(screen.getByText("Sample #3")).toBeInTheDocument();
+      expect(screen.getByText("icmp-unreachable")).toBeInTheDocument();
+      expect(screen.getAllByText("Successful Probes").length).toBeGreaterThan(0);
+      expect(screen.getByRole("button", { name: "Manage providers" })).toBeInTheDocument();
     });
   });
 });

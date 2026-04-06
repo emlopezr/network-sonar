@@ -5,12 +5,14 @@ import { createApp } from "../../backend/src/app";
 import type { AppConfig } from "../../backend/src/config";
 import { ConnectionLogRepository } from "../../backend/src/data/connection-log-repository";
 import { initializeDatabase } from "../../backend/src/data/db";
+import { MonitorSettingsRepository } from "../../backend/src/data/monitor-settings-repository";
 import { PurgeService } from "../../backend/src/data/purge-service";
 import { MonitorScheduler } from "../../backend/src/network/monitor-scheduler";
 import { CurrentStatusService } from "../../backend/src/services/current-status-service";
 import { MonitorEventBus } from "../../backend/src/services/event-bus";
 import { HistoryService } from "../../backend/src/services/history-service";
 import { MonitorService } from "../../backend/src/services/monitor-service";
+import { MonitorSettingsService } from "../../backend/src/services/monitor-settings-service";
 import type { WorkerCycleRequest, WorkerCycleResult } from "../../backend/src/types/monitor";
 
 export interface TestHarness {
@@ -22,6 +24,7 @@ export interface TestHarness {
   currentStatusService: CurrentStatusService;
   historyService: HistoryService;
   eventBus: MonitorEventBus;
+  monitorSettingsService: MonitorSettingsService;
   monitorService: MonitorService;
   createScheduler: (runner: (request: WorkerCycleRequest) => Promise<WorkerCycleResult>) => MonitorScheduler;
   close: () => void;
@@ -47,22 +50,31 @@ export function createTestHarness(): TestHarness {
     port: 4173,
     frontendDistPath: "/tmp/network-sonar-test-dist",
     monitor: {
-      target: "1.1.1.1",
+      targets: ["1.1.1.1", "8.8.8.8"],
       intervalSeconds: 5,
       retentionDays: 30,
       dbPath: ":memory:",
       staleAfterSeconds: 15,
       pingTimeoutMs: 3000,
       pingBinary: "ping",
-      heartbeatSeconds: 15
+      heartbeatSeconds: 15,
+      roundRobinEnabled: false
     }
   };
 
   const database = initializeDatabase(config.monitor.dbPath);
   const repository = new ConnectionLogRepository(database);
+  const monitorSettingsRepository = new MonitorSettingsRepository(database);
   const currentStatusService = new CurrentStatusService(repository, config.monitor.staleAfterSeconds);
-  const historyService = new HistoryService(repository);
+  const historyService = new HistoryService(repository, config.monitor.intervalSeconds);
   const eventBus = new MonitorEventBus();
+  const monitorSettingsService = new MonitorSettingsService(
+    monitorSettingsRepository,
+    eventBus,
+    config.monitor.targets,
+    config.monitor.roundRobinEnabled
+  );
+  monitorSettingsService.initialize();
   const monitorService = new MonitorService(
     repository,
     currentStatusService,
@@ -78,7 +90,8 @@ export function createTestHarness(): TestHarness {
       config,
       currentStatusService,
       historyService,
-      eventBus
+      eventBus,
+      monitorSettingsService
     }),
     config,
     database,
@@ -87,8 +100,16 @@ export function createTestHarness(): TestHarness {
     currentStatusService,
     historyService,
     eventBus,
+    monitorSettingsService,
     monitorService,
-    createScheduler: (runner) => new MonitorScheduler(config.monitor, monitorService, purgeService, runner),
+    createScheduler: (runner) =>
+      new MonitorScheduler(
+        config.monitor,
+        monitorService,
+        purgeService,
+        monitorSettingsService,
+        runner
+      ),
     close: () => {
       database.close();
     }

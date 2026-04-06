@@ -10,7 +10,7 @@ describe("GET /api/v1/events", () => {
     harness.close();
   });
 
-  it("streams retry instructions and an initial snapshot", async () => {
+  it("streams retry instructions plus initial snapshot and settings", async () => {
     const base = Math.floor(Date.now() / 1000);
 
     harness.monitorService.processCycle(createCycle({ observedAt: base }));
@@ -20,7 +20,9 @@ describe("GET /api/v1/events", () => {
 
     expect(chunk).toContain("retry: 5000");
     expect(chunk).toContain("event: snapshot");
+    expect(chunk).toContain("event: settings");
     expect(chunk).toContain("\"status\":\"ok\"");
+    expect(chunk).toContain("\"roundRobinEnabled\":false");
 
     harness.monitorService.processCycle(
       createCycle({

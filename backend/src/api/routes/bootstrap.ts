@@ -4,6 +4,7 @@ import { rangePresets } from "../../types/api";
 import type { BootstrapResponse, RangePreset } from "../../types/api";
 import type { CurrentStatusService } from "../../services/current-status-service";
 import type { HistoryService } from "../../services/history-service";
+import type { MonitorSettingsService } from "../../services/monitor-settings-service";
 
 const rangeSeconds: Record<RangePreset, number> = {
   "1h": 60 * 60,
@@ -22,7 +23,8 @@ export function createBootstrapRouter(
   currentStatusService: CurrentStatusService,
   historyService: HistoryService,
   retentionDays: number,
-  sampleIntervalSeconds: number
+  sampleIntervalSeconds: number,
+  monitorSettingsService: MonitorSettingsService
 ): Router {
   const router = Router();
 
@@ -35,7 +37,8 @@ export function createBootstrapRouter(
       current: currentStatusService.getCurrentSnapshot(to),
       history: historyService.getHistory(from, to),
       retentionDays,
-      sampleIntervalSeconds
+      sampleIntervalSeconds,
+      monitorSettings: monitorSettingsService.getSettings()
     };
 
     response.json(payload);

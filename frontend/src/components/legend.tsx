@@ -1,9 +1,46 @@
-export function Legend() {
+export function Legend({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return (
+      <ul className="legend legend--compact" role="list" aria-label="Status legend">
+        <li>
+          <i className="legend__swatch legend__swatch--ok" aria-hidden="true" />
+          <span>Operational</span>
+        </li>
+        <li>
+          <i className="legend__swatch legend__swatch--down" aria-hidden="true" />
+          <span>No Connection</span>
+        </li>
+        <li>
+          <i className="legend__swatch legend__swatch--stale" aria-hidden="true" />
+          <span>No Data</span>
+        </li>
+      </ul>
+    );
+  }
+
   return (
-    <div className="legend">
-      <span><i className="legend__swatch legend__swatch--ok" /> Operativa</span>
-      <span><i className="legend__swatch legend__swatch--down" /> Sin conexion</span>
-      <span><i className="legend__swatch legend__swatch--stale" /> Sin datos recientes</span>
-    </div>
+    <ul className="legend" role="list" aria-label="Status legend">
+      <li>
+        <i className="legend__swatch legend__swatch--ok" aria-hidden="true" />
+        <span>
+          <strong>Operational</strong>
+          The external target is responding within the normal sampling cadence.
+        </span>
+      </li>
+      <li>
+        <i className="legend__swatch legend__swatch--down" aria-hidden="true" />
+        <span>
+          <strong>Offline</strong>
+          Connectivity loss detected by the local probe.
+        </span>
+      </li>
+      <li>
+        <i className="legend__swatch legend__swatch--stale" aria-hidden="true" />
+        <span>
+          <strong>No recent data</strong>
+          No new samples arrived before the freshness threshold.
+        </span>
+      </li>
+    </ul>
   );
 }

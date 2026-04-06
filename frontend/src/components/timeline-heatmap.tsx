@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { MonitorSample } from "../types/monitor";
+import type { MonitorSample, RangePreset } from "../types/monitor";
+import { getRangeCopy } from "../utils/range";
 
 function getSampleTone(status: MonitorSample["status"]): string {
   switch (status) {
@@ -11,24 +12,29 @@ function getSampleTone(status: MonitorSample["status"]): string {
   }
 }
 
-function formatDateTime(unixSeconds: number): string {
-  const formatter = new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "medium"
-  });
+const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+  timeStyle: "medium"
+});
 
-  return formatter.format(new Date(unixSeconds * 1000));
+const tickFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit"
+});
+
+interface TimelineTooltipState {
+  sample: MonitorSample;
+  left: number;
+}
+
+function formatDateTime(unixSeconds: number): string {
+  return dateTimeFormatter.format(new Date(unixSeconds * 1000));
 }
 
 function formatTick(unixSeconds: number): string {
-  const formatter = new Intl.DateTimeFormat("es-CO", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-
-  return formatter.format(new Date(unixSeconds * 1000));
+  return tickFormatter.format(new Date(unixSeconds * 1000));
 }
 
 function scrollStripToEnd(strip: HTMLDivElement, behavior: ScrollBehavior): void {
@@ -46,15 +52,22 @@ function scrollStripToEnd(strip: HTMLDivElement, behavior: ScrollBehavior): void
 export function TimelineHeatmap({
   samples,
   selectedSample,
-  onSelectSample
+  onSelectSample,
+  range,
+  liveMode,
+  onLiveModeChange
 }: {
   samples: MonitorSample[];
   selectedSample: MonitorSample | null;
   onSelectSample: (sample: MonitorSample) => void;
+  range: RangePreset;
+  liveMode: boolean;
+  onLiveModeChange: (nextValue: boolean) => void;
 }) {
   const stripRef = useRef<HTMLDivElement | null>(null);
+  const stripViewportRef = useRef<HTMLDivElement | null>(null);
   const autoScrollRef = useRef(false);
-  const [liveMode, setLiveMode] = useState(true);
+  const [tooltip, setTooltip] = useState<TimelineTooltipState | null>(null);
 
   useEffect(() => {
     const strip = stripRef.current;
@@ -75,25 +88,26 @@ export function TimelineHeatmap({
     };
   }, [samples, liveMode]);
 
-  function updateLiveMode(nextValue: boolean): void {
-    setLiveMode(nextValue);
+  useEffect(() => {
+    setTooltip(null);
+  }, [samples.length, liveMode]);
 
-    if (!nextValue) {
-      return;
-    }
-
+  function showTooltip(sample: MonitorSample, target: HTMLButtonElement): void {
     const strip = stripRef.current;
+    const viewport = stripViewportRef.current;
 
-    if (!strip) {
+    if (!strip || !viewport) {
       return;
     }
 
-    autoScrollRef.current = true;
-    scrollStripToEnd(strip, "smooth");
+    const rawLeft = target.offsetLeft - strip.scrollLeft + target.offsetWidth / 2;
+    const horizontalPadding = 112;
+    const maximum = Math.max(horizontalPadding, viewport.clientWidth - horizontalPadding);
 
-    window.setTimeout(() => {
-      autoScrollRef.current = false;
-    }, 250);
+    setTooltip({
+      sample,
+      left: Math.min(Math.max(rawLeft, horizontalPadding), maximum)
+    });
   }
 
   function handleTimelineScroll(): void {
@@ -103,92 +117,93 @@ export function TimelineHeatmap({
       return;
     }
 
+    setTooltip(null);
+
     const remaining = strip.scrollWidth - strip.clientWidth - strip.scrollLeft;
 
     if (remaining > 24 && liveMode) {
-      setLiveMode(false);
+      onLiveModeChange(false);
       return;
     }
   }
 
-  if (samples.length === 0) {
-    return (
-      <section className="panel">
-        <p className="eyebrow">Historial</p>
-        <h2>Sin muestras en el rango seleccionado</h2>
-      </section>
-    );
-  }
-
   return (
-    <section className="panel">
-      <div className="timeline__header">
-        <div>
-          <p className="eyebrow">Historial</p>
-          <h2>Linea de tiempo de muestras</h2>
-        </div>
-        <div className="timeline__toolbar">
-          <p className="timeline__count">{samples.length} muestras</p>
-          <button
-            type="button"
-            className={`timeline-live-toggle${liveMode ? " is-active" : ""}`}
-            onClick={() => updateLiveMode(!liveMode)}
-          >
-            {liveMode ? "Live on" : "Live off"}
-          </button>
-        </div>
+    <section className="timeline-panel">
+      <div className="timeline-panel__header">
+        <h3 className="timeline-panel__title">Connectivity Heatmap ({getRangeCopy(range)})</h3>
+        <span className="timeline-panel__count mono">
+          Samples: {samples.length.toLocaleString("en-US")}
+        </span>
       </div>
-      <div className="timeline-axis">
-        <span>{formatTick(samples[0]?.observedAt ?? 0)}</span>
-        <span>{formatTick(samples[Math.floor(samples.length / 2)]?.observedAt ?? 0)}</span>
-        <span>{formatTick(samples[samples.length - 1]?.observedAt ?? 0)}</span>
-      </div>
-      <div
-        ref={stripRef}
-        className="timeline-strip"
-        role="list"
-        aria-label="Historial de conectividad"
-        data-live-mode={liveMode ? "on" : "off"}
-        onScroll={handleTimelineScroll}
-      >
-        {samples.map((sample) => (
-          <button
-            key={sample.observedAt}
-            type="button"
-            role="listitem"
-            className={`timeline-strip__cell timeline-strip__cell--${getSampleTone(sample.status)}${selectedSample?.observedAt === sample.observedAt ? " is-selected" : ""}`}
-            onMouseEnter={() => onSelectSample(sample)}
-            onFocus={() => onSelectSample(sample)}
-            onClick={() => onSelectSample(sample)}
-            title={`${formatDateTime(sample.observedAt)} | ${sample.status} | ${sample.failureReason ?? "sin error"}`}
-          >
-            <span className="sr-only">{`${formatDateTime(sample.observedAt)} ${sample.status}`}</span>
-          </button>
-        ))}
-      </div>
-      {selectedSample ? (
-        <div className="timeline-detail">
-          <p className="eyebrow">Detalle</p>
-          <dl className="timeline-detail__grid">
-            <div>
-              <dt>Hora</dt>
-              <dd>{formatDateTime(selectedSample.observedAt)}</dd>
-            </div>
-            <div>
-              <dt>Estado</dt>
-              <dd>{selectedSample.status === "ok" ? "Operativa" : "Sin conexion"}</dd>
-            </div>
-            <div>
-              <dt>Latencia</dt>
-              <dd>{selectedSample.externalLatencyMs === null ? "Sin dato" : `${selectedSample.externalLatencyMs} ms`}</dd>
-            </div>
-            <div>
-              <dt>Motivo</dt>
-              <dd>{selectedSample.failureReason ?? "Sin error"}</dd>
-            </div>
-          </dl>
+      {samples.length === 0 ? (
+        <div className="timeline-empty">
+          <p className="eyebrow">No telemetry</p>
+          <h3>No samples in the selected range</h3>
+          <p className="timeline__summary">
+            Adjust the time window or refresh the range to load the available history again.
+          </p>
         </div>
-      ) : null}
+      ) : (
+        <>
+          <div className="timeline-axis">
+            <span className="mono">{formatTick(samples[0]?.observedAt ?? 0)}</span>
+            <span className="mono">{formatTick(samples[Math.floor(samples.length / 2)]?.observedAt ?? 0)}</span>
+            <span className="mono">{formatTick(samples[samples.length - 1]?.observedAt ?? 0)}</span>
+          </div>
+          <div ref={stripViewportRef} className="timeline-strip-shell">
+            <div
+              ref={stripRef}
+              className="timeline-strip"
+              role="list"
+              aria-label="Connectivity history"
+              data-live-mode={liveMode ? "on" : "off"}
+              onScroll={handleTimelineScroll}
+            >
+              {samples.map((sample) => (
+                <button
+                  key={sample.observedAt}
+                  type="button"
+                  role="listitem"
+                  aria-pressed={selectedSample?.observedAt === sample.observedAt}
+                  className={`timeline-strip__cell timeline-strip__cell--${getSampleTone(sample.status)}${selectedSample?.observedAt === sample.observedAt ? " is-selected" : ""}`}
+                  onMouseEnter={(event) => {
+                    onSelectSample(sample);
+                    showTooltip(sample, event.currentTarget);
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
+                  onFocus={(event) => {
+                    onSelectSample(sample);
+                    showTooltip(sample, event.currentTarget);
+                  }}
+                  onBlur={() => setTooltip(null)}
+                  onClick={(event) => {
+                    onSelectSample(sample);
+                    showTooltip(sample, event.currentTarget);
+                  }}
+                >
+                  <span className="sr-only">{`${formatDateTime(sample.observedAt)} ${sample.status}`}</span>
+                </button>
+              ))}
+            </div>
+            {tooltip ? (
+              <div className="timeline-tooltip" style={{ left: `${tooltip.left}px` }} role="status">
+                <p className="timeline-tooltip__status">
+                  STATUS: {tooltip.sample.status === "ok" ? "OK" : "DOWN"}
+                </p>
+                <p className="timeline-tooltip__time mono">{formatDateTime(tooltip.sample.observedAt)}</p>
+                <p className="timeline-tooltip__meta mono">
+                  {tooltip.sample.externalLatencyMs === null
+                    ? "Latency unavailable"
+                    : `Latency ${tooltip.sample.externalLatencyMs} ms`}
+                </p>
+                <p className="timeline-tooltip__meta">
+                  {tooltip.sample.failureReason ?? "PING Successful"}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        </>
+      )}
     </section>
   );
 }

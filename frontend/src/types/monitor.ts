@@ -3,6 +3,26 @@ export type RangePreset = (typeof rangePresets)[number];
 
 export type MonitorStatus = "ok" | "down";
 export type SnapshotStatus = MonitorStatus | "stale";
+export type OutageIncidentStatus = "ongoing" | "resolved";
+export type MonitorProviderCompany = "Cloudflare" | "Google" | "Quad9" | "OpenDNS";
+export type MonitorProviderKind = "default" | "custom";
+
+export interface MonitorProviderRecord {
+  id: number;
+  label: string;
+  target: string;
+  company: MonitorProviderCompany | null;
+  logoUrl: string | null;
+  kind: MonitorProviderKind;
+  isDefault: boolean;
+  isEnabled: boolean;
+  sortOrder: number;
+}
+
+export interface MonitorSettings {
+  roundRobinEnabled: boolean;
+  providers: MonitorProviderRecord[];
+}
 
 export interface MonitorSample {
   observedAt: number;
@@ -29,6 +49,7 @@ export interface BootstrapResponse {
   history: MonitorSample[];
   retentionDays: number;
   sampleIntervalSeconds: number;
+  monitorSettings: MonitorSettings;
 }
 
 export interface HistoryResponse {
@@ -37,6 +58,50 @@ export interface HistoryResponse {
   samples: MonitorSample[];
 }
 
+export interface OutageIncident {
+  startedAt: number;
+  lastObservedAt: number;
+  resolvedAt: number | null;
+  durationSeconds: number;
+  sampleCount: number;
+  externalTarget: string;
+  latestFailureReason: string | null;
+  latestLatencyMs: number | null;
+  status: OutageIncidentStatus;
+  samples: MonitorSample[];
+}
+
+export interface IncidentHistoryResponse {
+  from: number;
+  to: number;
+  incidents: OutageIncident[];
+}
+
 export interface SnapshotEventPayload {
   current: CurrentStatusSnapshot;
+}
+
+export interface SettingsEventPayload {
+  monitorSettings: MonitorSettings;
+}
+
+export interface UpdateMonitorSettingsRequest {
+  roundRobinEnabled: boolean;
+}
+
+export interface CreateMonitorProviderRequest {
+  label: string;
+  target: string;
+  logoUrl?: string;
+}
+
+export interface UpdateMonitorProviderRequest {
+  label?: string;
+  target?: string;
+  logoUrl?: string;
+  isEnabled?: boolean;
+}
+
+export interface ReorderMonitorProvidersRequest {
+  providerIds: number[];
 }

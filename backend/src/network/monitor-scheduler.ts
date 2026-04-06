@@ -1,5 +1,7 @@
+import { buildProbeOrder } from "./target-probe";
 import { runMonitorWorker } from "./monitor-worker";
 import type { PurgeService } from "../data/purge-service";
+import type { MonitorSettingsService } from "../services/monitor-settings-service";
 import type { MonitorService } from "../services/monitor-service";
 import type { WorkerCycleRequest, WorkerCycleResult } from "../types/monitor";
 
@@ -10,15 +12,17 @@ export class MonitorScheduler {
 
   private running = false;
 
+  private cycleCursor = 0;
+
   public constructor(
     private readonly config: {
-      target: string;
       intervalSeconds: number;
       pingTimeoutMs: number;
       pingBinary: string;
     },
     private readonly monitorService: MonitorService,
     private readonly purgeService: PurgeService,
+    private readonly monitorSettingsService: MonitorSettingsService,
     private readonly workerRunner: WorkerRunner = runMonitorWorker
   ) {}
 
@@ -52,15 +56,24 @@ export class MonitorScheduler {
     try {
       const observedAt = Math.floor(Date.now() / 1000);
       this.purgeService.maybePurge(observedAt);
+      const monitorSettings = this.monitorSettingsService.getSettings();
+      const activeTargets = monitorSettings.providers
+        .filter((provider) => provider.isEnabled)
+        .map((provider) => provider.target);
+      const externalTargets = buildProbeOrder(
+        activeTargets,
+        monitorSettings.roundRobinEnabled ? this.cycleCursor : 0
+      );
 
       const cycle = await this.workerRunner({
         observedAt,
-        externalTarget: this.config.target,
+        externalTargets,
         timeoutMs: this.config.pingTimeoutMs,
         pingBinary: this.config.pingBinary
       });
 
       this.monitorService.processCycle(cycle);
+      this.cycleCursor += 1;
     } catch (error) {
       console.error("Monitor cycle failed", error);
     } finally {

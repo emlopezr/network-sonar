@@ -25,6 +25,8 @@ describe("quickstart smoke flow", () => {
     const bootstrapBody = bootstrap.body as unknown as BootstrapResponse;
     expect(bootstrap.status).toBe(200);
     expect(bootstrapBody.current.status).toBe("ok");
+    expect(bootstrapBody.monitorSettings.roundRobinEnabled).toBe(false);
+    expect(bootstrapBody.monitorSettings.providers.length).toBeGreaterThan(2);
 
     const history = await request(harness.app).get(`/api/v1/history?from=${base - 10}&to=${base + 10}`);
     const historyBody = history.body as unknown as HistoryResponse;

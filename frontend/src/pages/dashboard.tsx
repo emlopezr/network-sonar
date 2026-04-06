@@ -1,33 +1,40 @@
 import { startTransition, useDeferredValue, useEffect, useState } from "react";
 
+import type { AppPath } from "../components/app-shell";
+import { AppShell } from "../components/app-shell";
+import { InspectorPanel } from "../components/inspector-panel";
 import { Legend } from "../components/legend";
+import { ProviderStrategyPanel } from "../components/provider-strategy-panel";
 import { StatusCard } from "../components/status-card";
 import { TimelineHeatmap } from "../components/timeline-heatmap";
 import { fetchBootstrap, fetchHistory } from "../services/api-client";
 import { connectStatusStream } from "../services/status-stream";
+import { buildProviderRuntimeStats } from "../utils/provider-runtime";
+import { getRangeSeconds } from "../utils/range";
 import type {
   BootstrapResponse,
   CurrentStatusSnapshot,
   MonitorSample,
+  MonitorSettings,
   RangePreset
 } from "../types/monitor";
 import { rangePresets } from "../types/monitor";
 
 type StreamState = "connecting" | "live" | "reconnecting";
+const defaultMonitorSettings: MonitorSettings = {
+  roundRobinEnabled: false,
+  providers: []
+};
 
-function getRangeSeconds(range: RangePreset): number {
-  switch (range) {
-    case "1h":
-      return 60 * 60;
-    case "6h":
-      return 6 * 60 * 60;
-    case "24h":
-      return 24 * 60 * 60;
-    case "7d":
-      return 7 * 24 * 60 * 60;
-    case "30d":
-      return 30 * 24 * 60 * 60;
+function normalizeMonitorSettings(settings: MonitorSettings | undefined): MonitorSettings {
+  if (!settings) {
+    return defaultMonitorSettings;
   }
+
+  return {
+    roundRobinEnabled: settings.roundRobinEnabled,
+    providers: settings.providers ?? []
+  };
 }
 
 function normalizeCurrentSnapshot(previous: CurrentStatusSnapshot | null, sample: MonitorSample): CurrentStatusSnapshot {
@@ -58,7 +65,31 @@ function mergeHistorySample(
     .sort((left, right) => left.observedAt - right.observedAt);
 }
 
-export function Dashboard() {
+function getOperationalRate(samples: MonitorSample[]): string {
+  if (samples.length === 0) {
+    return "--";
+  }
+
+  const okSamples = samples.filter((sample) => sample.status === "ok").length;
+  return `${((okSamples / samples.length) * 100).toFixed(2)}%`;
+}
+
+function getStreamLabel(streamState: StreamState): string {
+  switch (streamState) {
+    case "connecting":
+      return "Connecting";
+    case "live":
+      return "Live";
+    case "reconnecting":
+      return "Reconnecting";
+  }
+}
+
+export function Dashboard({
+  onNavigate = () => undefined
+}: {
+  onNavigate?: (path: AppPath) => void;
+}) {
   const [range, setRange] = useState<RangePreset>("1h");
   const [current, setCurrent] = useState<CurrentStatusSnapshot | null>(null);
   const [history, setHistory] = useState<MonitorSample[]>([]);
@@ -68,9 +99,17 @@ export function Dashboard() {
   const [streamState, setStreamState] = useState<StreamState>("connecting");
   const [error, setError] = useState<string | null>(null);
   const [lastEventAt, setLastEventAt] = useState<number | null>(null);
+  const [liveMode, setLiveMode] = useState(true);
+  const [monitorSettings, setMonitorSettings] = useState<MonitorSettings>(defaultMonitorSettings);
+  const [isProviderPanelOpen, setIsProviderPanelOpen] = useState(false);
 
   const deferredHistory = useDeferredValue(history);
   const rangeWindow = getRangeSeconds(range);
+  const providerStats = buildProviderRuntimeStats(
+    monitorSettings.providers,
+    history,
+    current?.externalTarget ?? null
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -91,10 +130,11 @@ export function Dashboard() {
           setSelectedSample(payload.history[payload.history.length - 1] ?? null);
           setRetentionDays(payload.retentionDays);
           setSampleIntervalSeconds(payload.sampleIntervalSeconds);
+          setMonitorSettings(normalizeMonitorSettings(payload.monitorSettings));
         });
       } catch (loadError) {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : "No se pudo cargar el estado inicial.");
+          setError(loadError instanceof Error ? loadError.message : "Could not load the initial status.");
         }
       }
     }
@@ -112,6 +152,9 @@ export function Dashboard() {
       onSnapshot: (payload) => {
         setCurrent(payload.current);
         setLastEventAt(Math.floor(Date.now() / 1000));
+      },
+      onSettings: (payload) => {
+        setMonitorSettings(normalizeMonitorSettings(payload.monitorSettings));
       },
       onSample: (payload) => {
         setCurrent((previous) => normalizeCurrentSnapshot(previous, payload));
@@ -157,6 +200,9 @@ export function Dashboard() {
   }, []);
 
   const from = Math.floor(Date.now() / 1000) - rangeWindow;
+  const selectedSampleIndex = selectedSample
+    ? history.findIndex((sample) => sample.observedAt === selectedSample.observedAt)
+    : -1;
 
   const refreshHistory = async (): Promise<void> => {
     const to = Math.floor(Date.now() / 1000);
@@ -166,52 +212,98 @@ export function Dashboard() {
   };
 
   return (
-    <div className="dashboard-shell">
-      <header className="dashboard-header">
-        <div>
-          <p className="eyebrow">Network Sonar</p>
-          <h1>Monitor local de conectividad</h1>
-          <p className="dashboard-header__copy">
-            Supervisa cambios en vivo y conserva contexto historico para distinguir incidentes del proveedor frente a fallas internas.
-          </p>
+    <AppShell
+      activePage="dashboard"
+      onNavigate={onNavigate}
+      topbarContent={
+        <div className={`dashboard-topbar__stream dashboard-topbar__stream--${streamState}`}>
+          <span className="dashboard-topbar__pulse" aria-hidden="true" />
+          <span className="mono">SSE: {getStreamLabel(streamState)}</span>
         </div>
-        <div className="dashboard-controls">
-          <label>
-            Rango
-            <select value={range} onChange={(event) => setRange(event.target.value as RangePreset)}>
-              {rangePresets.map((preset) => (
-                <option key={preset} value={preset}>
-                  {preset}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" onClick={() => void refreshHistory()}>
-            Recargar rango
-          </button>
-        </div>
-      </header>
+      }
+    >
+      <main className="dashboard-content">
+        {error ? (
+          <section className="error-banner">
+            <span className="error-banner__label">Alert</span>
+            <p>{error}</p>
+          </section>
+        ) : null}
 
-      {error ? <div className="panel panel--error">{error}</div> : null}
+        <StatusCard
+          snapshot={current}
+          streamState={streamState}
+          lastEventAt={lastEventAt}
+          operationalRate={getOperationalRate(history)}
+        />
 
-      <div className="dashboard-grid">
-        <StatusCard snapshot={current} streamState={streamState} lastEventAt={lastEventAt} />
-
-        <section className="panel">
-          <p className="eyebrow">Retencion</p>
-          <h2>{retentionDays} dias de historial</h2>
-          <p className="stacked-copy">
-            Cada bloque representa una muestra real cada {sampleIntervalSeconds} segundos. El rango actual cubre los ultimos {range}.
-          </p>
-          <Legend />
+        <section className="control-bar">
+          <div className="control-bar__ranges" role="tablist" aria-label="Time range">
+            {rangePresets.map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                role="tab"
+                aria-selected={range === preset}
+                className={`control-bar__range${range === preset ? " is-active" : ""}`}
+                onClick={() => setRange(preset)}
+              >
+                {preset}
+              </button>
+            ))}
+          </div>
+          <div className="control-bar__actions">
+            <div className="live-switch">
+              <span className="live-switch__label mono">Live Stream</span>
+              <button
+                type="button"
+                className={`live-switch__toggle${liveMode ? " is-active" : ""}`}
+                aria-pressed={liveMode}
+                onClick={() => setLiveMode((previous) => !previous)}
+              >
+                <span className="live-switch__thumb" />
+              </button>
+              <span className={`live-switch__value mono${liveMode ? " is-active" : ""}`}>
+                {liveMode ? "ON" : "OFF"}
+              </span>
+            </div>
+            <span className="control-bar__divider" aria-hidden="true" />
+            <button
+              type="button"
+              className="control-bar__refresh mono"
+              onClick={() => void refreshHistory()}
+            >
+              Refresh range
+            </button>
+          </div>
         </section>
-      </div>
 
-      <TimelineHeatmap
-        samples={deferredHistory}
-        selectedSample={selectedSample}
-        onSelectSample={setSelectedSample}
-      />
-    </div>
+        <TimelineHeatmap
+          samples={deferredHistory}
+          selectedSample={selectedSample}
+          onSelectSample={setSelectedSample}
+          range={range}
+          liveMode={liveMode}
+          onLiveModeChange={setLiveMode}
+        />
+
+        <InspectorPanel sample={selectedSample} sampleIndex={selectedSampleIndex} />
+
+        <ProviderStrategyPanel
+          isOpen={isProviderPanelOpen}
+          monitorSettings={monitorSettings}
+          providerStats={providerStats}
+          onToggleOpen={() => setIsProviderPanelOpen((previous) => !previous)}
+          onNavigate={onNavigate}
+        />
+
+        <footer className="dashboard-footer">
+          <Legend compact />
+          <div className="dashboard-footer__meta mono">
+            Instance ID: SONAR-NODE-01 // Retention: {retentionDays}d // Cadence: {sampleIntervalSeconds}s
+          </div>
+        </footer>
+      </main>
+    </AppShell>
   );
 }

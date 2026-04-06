@@ -8,8 +8,11 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
+    "lucide-react": "^1.7.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   }
 }
-

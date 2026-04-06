@@ -1,16 +1,16 @@
 import type { SnapshotStatus } from "../types/monitor";
 
 const labels: Record<SnapshotStatus, string> = {
-  ok: "Operativa",
-  down: "Sin conexion",
-  stale: "Desactualizada"
+  ok: "Operational",
+  down: "Offline",
+  stale: "Stale"
 };
 
 export function ConnectionBadge({ status }: { status: SnapshotStatus }) {
   return (
     <span className={`connection-badge connection-badge--${status}`}>
       <span className="connection-badge__dot" />
-      {labels[status]}
+      <span className="connection-badge__label">{labels[status]}</span>
     </span>
   );
 }

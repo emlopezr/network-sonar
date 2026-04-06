@@ -1,27 +1,19 @@
 import { parentPort, workerData } from "node:worker_threads";
 
-import { runPingCommand } from "./ping-command";
+import { runProbeSequence } from "./target-probe";
 import type { WorkerCycleRequest, WorkerCycleResult } from "../types/monitor";
 
 async function performWorkerCycle(request: WorkerCycleRequest): Promise<WorkerCycleResult> {
   const observedAt = request.observedAt ?? Math.floor(Date.now() / 1000);
-  const externalProbe = await runPingCommand(
+  const { externalTarget, externalProbe } = await runProbeSequence(
     request.pingBinary,
-    request.externalTarget,
+    request.externalTargets,
     request.timeoutMs
   );
 
-  if (externalProbe.ok) {
-    return {
-      observedAt,
-      externalTarget: request.externalTarget,
-      externalProbe
-    };
-  }
-
   return {
     observedAt,
-    externalTarget: request.externalTarget,
+    externalTarget,
     externalProbe
   };
 }

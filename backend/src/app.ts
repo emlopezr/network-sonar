@@ -5,17 +5,21 @@ import express from "express";
 import { createBootstrapRouter } from "./api/routes/bootstrap";
 import { createHealthRouter } from "./api/routes/health";
 import { createHistoryRouter } from "./api/routes/history";
+import { createIncidentsRouter } from "./api/routes/incidents";
+import { createMonitorSettingsRouter } from "./api/routes/monitor-settings";
 import { createStatusStreamRouter } from "./api/sse/status-stream";
 import type { AppConfig } from "./config";
 import type { CurrentStatusService } from "./services/current-status-service";
 import type { MonitorEventBus } from "./services/event-bus";
 import type { HistoryService } from "./services/history-service";
+import type { MonitorSettingsService } from "./services/monitor-settings-service";
 
 export interface AppDependencies {
   config: AppConfig;
   currentStatusService: CurrentStatusService;
   historyService: HistoryService;
   eventBus: MonitorEventBus;
+  monitorSettingsService: MonitorSettingsService;
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -29,15 +33,19 @@ export function createApp(dependencies: AppDependencies) {
       dependencies.currentStatusService,
       dependencies.historyService,
       dependencies.config.monitor.retentionDays,
-      dependencies.config.monitor.intervalSeconds
+      dependencies.config.monitor.intervalSeconds,
+      dependencies.monitorSettingsService
     )
   );
   app.use(createHistoryRouter(dependencies.historyService));
+  app.use(createIncidentsRouter(dependencies.historyService));
+  app.use(createMonitorSettingsRouter(dependencies.monitorSettingsService));
   app.use(
     createStatusStreamRouter(
       dependencies.currentStatusService,
       dependencies.eventBus,
-      dependencies.config.monitor.heartbeatSeconds
+      dependencies.config.monitor.heartbeatSeconds,
+      dependencies.monitorSettingsService
     )
   );
 

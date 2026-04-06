@@ -14,7 +14,19 @@ export function initializeDatabase(dbPath: string): Database.Database {
   const fallbackMigrationPath = path.resolve(process.cwd(), "backend/src/data/migrations/001_init.sql");
   const sql = fs.readFileSync(fs.existsSync(migrationPath) ? migrationPath : fallbackMigrationPath, "utf8");
   database.exec(sql);
+  ensureMonitorProvidersLogoUrlColumn(database);
 
   return database;
 }
 
+function ensureMonitorProvidersLogoUrlColumn(database: Database.Database): void {
+  const columns = database
+    .prepare("PRAGMA table_info(monitor_providers)")
+    .all() as Array<{ name: string }>;
+
+  if (columns.some((column) => column.name === "logo_url")) {
+    return;
+  }
+
+  database.exec("ALTER TABLE monitor_providers ADD COLUMN logo_url TEXT");
+}

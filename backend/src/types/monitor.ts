@@ -32,7 +32,7 @@ export interface MonitorProbeResult {
 
 export interface WorkerCycleRequest {
   observedAt?: number;
-  externalTarget: string;
+  externalTargets: string[];
   timeoutMs: number;
   pingBinary: string;
 }

@@ -3,87 +3,141 @@ import type { CurrentStatusSnapshot } from "../types/monitor";
 
 type StreamState = "connecting" | "live" | "reconnecting";
 
-function formatDateTime(unixSeconds: number): string {
+function formatRelativeTime(unixSeconds: number): string {
   if (unixSeconds <= 0) {
-    return "Sin datos";
+    return "No data";
   }
 
-  return new Intl.DateTimeFormat("es-CO", {
-    dateStyle: "medium",
-    timeStyle: "medium"
-  }).format(new Date(unixSeconds * 1000));
+  const deltaSeconds = Math.max(0, Math.floor(Date.now() / 1000) - unixSeconds);
+
+  if (deltaSeconds < 10) {
+    return "Now";
+  }
+
+  if (deltaSeconds < 60) {
+    return `${deltaSeconds}s ago`;
+  }
+
+  if (deltaSeconds < 3600) {
+    return `${Math.floor(deltaSeconds / 60)}m ago`;
+  }
+
+  if (deltaSeconds < 86_400) {
+    return `${Math.floor(deltaSeconds / 3600)}h ago`;
+  }
+
+  return `${Math.floor(deltaSeconds / 86_400)}d ago`;
 }
 
 function getDiagnosis(snapshot: CurrentStatusSnapshot): string {
   switch (snapshot.status) {
     case "ok":
-      return "El destino externo responde. No hay incidentes activos.";
+      return "The external target is responding. There are no active incidents.";
     case "down":
-      return "El ping externo fallo. Se registro una caida de conectividad desde este equipo.";
+      return "The external probe failed. A connectivity outage was recorded from this machine.";
     case "stale":
-      return "No han llegado muestras recientes. Verifica el proceso local o la conexion SSE.";
+      return "No recent samples have arrived. Check the local monitor or the SSE connection.";
+  }
+}
+
+function getStreamLabel(streamState: StreamState): string {
+  switch (streamState) {
+    case "live":
+      return "Live";
+    case "connecting":
+      return "Connecting";
+    case "reconnecting":
+      return "Reconnecting";
+  }
+}
+
+function getHeadline(status: CurrentStatusSnapshot["status"]): string {
+  switch (status) {
+    case "ok":
+      return "OK: OPERATIONAL";
+    case "down":
+      return "DOWN: INCIDENT";
+    case "stale":
+      return "STALE: NO DATA";
   }
 }
 
 export function StatusCard({
   snapshot,
   streamState,
-  lastEventAt
+  lastEventAt,
+  operationalRate
 }: {
   snapshot: CurrentStatusSnapshot | null;
   streamState: StreamState;
   lastEventAt: number | null;
+  operationalRate: string;
 }) {
   if (!snapshot) {
     return (
-      <section className="panel status-card">
-        <p className="eyebrow">Estado actual</p>
-        <h1>Esperando la primera muestra</h1>
+      <section className="status-hero status-hero--pending">
+        <div className="status-hero__primary">
+          <span className="status-hero__label">Current state</span>
+          <h1>WAITING: INITIAL SAMPLE</h1>
+          <p className="status-hero__meta mono">System stability: --</p>
+        </div>
+        <dl className="status-hero__secondary">
+          <div className="status-hero__metric">
+            <dt>Target</dt>
+            <dd className="mono">Not configured</dd>
+          </div>
+          <div className="status-hero__metric">
+            <dt>Latency</dt>
+            <dd className="mono">No data</dd>
+          </div>
+          <div className="status-hero__metric">
+            <dt>Last Change</dt>
+            <dd className="mono">No data</dd>
+          </div>
+          <div className="status-hero__metric">
+            <dt>Heartbeat</dt>
+            <dd className="mono">No data</dd>
+          </div>
+        </dl>
       </section>
     );
   }
 
   return (
-    <section className="panel status-card">
-      <div className="status-card__header">
-        <div>
-          <p className="eyebrow">Estado actual</p>
-          <h1>Supervision de conectividad local</h1>
+    <section className={`status-hero status-hero--${snapshot.status}`}>
+      <div className="status-hero__primary">
+        <div className="status-hero__headline">
+          <div>
+            <span className="status-hero__label">Current state</span>
+            <h1>{getHeadline(snapshot.status)}</h1>
+          </div>
+          <ConnectionBadge status={snapshot.status} />
         </div>
-        <ConnectionBadge status={snapshot.status} />
+        <p className="status-hero__meta mono">System stability: {operationalRate}</p>
+        <p className="status-hero__copy">{getDiagnosis(snapshot)}</p>
       </div>
-      <p className="status-card__summary">{getDiagnosis(snapshot)}</p>
-      <dl className="status-card__metrics">
-        <div>
-          <dt>Destino</dt>
-          <dd>{snapshot.externalTarget || "Sin configurar"}</dd>
+      <dl className="status-hero__secondary">
+        <div className="status-hero__metric">
+          <dt className="status-hero__metric-label">Target</dt>
+          <dd className="mono">{snapshot.externalTarget || "Not configured"}</dd>
         </div>
-        <div>
-          <dt>Latencia</dt>
-          <dd>{snapshot.externalLatencyMs === null ? "Sin dato" : `${snapshot.externalLatencyMs} ms`}</dd>
+        <div className="status-hero__metric">
+          <dt className="status-hero__metric-label">Latency</dt>
+          <dd className="mono">
+            {snapshot.externalLatencyMs === null ? "No data" : `${snapshot.externalLatencyMs} ms`}
+          </dd>
         </div>
-        <div>
-          <dt>Ultima muestra</dt>
-          <dd>{formatDateTime(snapshot.observedAt)}</dd>
+        <div className="status-hero__metric">
+          <dt className="status-hero__metric-label">Last Change</dt>
+          <dd className="mono">{formatRelativeTime(snapshot.lastChangeAt)}</dd>
         </div>
-        <div>
-          <dt>Ultimo cambio</dt>
-          <dd>{formatDateTime(snapshot.lastChangeAt)}</dd>
-        </div>
-        <div>
-          <dt>Stream</dt>
-          <dd>{streamState === "live" ? "En vivo" : streamState === "connecting" ? "Conectando" : "Reconectando"}</dd>
-        </div>
-        <div>
-          <dt>Ultimo heartbeat</dt>
-          <dd>{lastEventAt ? formatDateTime(lastEventAt) : "Sin heartbeat"}</dd>
+        <div className="status-hero__metric">
+          <dt className="status-hero__metric-label">Heartbeat</dt>
+          <dd className={`mono status-hero__heartbeat status-hero__heartbeat--${streamState}`}>
+            {lastEventAt ? formatRelativeTime(lastEventAt) : getStreamLabel(streamState)}
+          </dd>
         </div>
       </dl>
-      <p className="status-card__detail">
-        {snapshot.failureReason
-          ? `Ultimo motivo reportado: ${snapshot.failureReason}`
-          : "Sin errores recientes en la sonda."}
-      </p>
     </section>
   );
 }
