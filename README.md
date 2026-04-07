@@ -1,43 +1,117 @@
 # Network Sonar
 
-Network Sonar is a local connectivity monitor with an Express backend, a React/Vite dashboard, lightweight SQLite persistence, and live updates over Server-Sent Events (SSE). It is designed to run quietly in the background, sample connectivity on a fixed interval, and expose a local web UI for current status and recent history.
+Docker
+Node.js
+TypeScript
+React
+SQLite
 
-The current implementation records each probe as `ok` or `down`, and the UI can mark the latest snapshot as `stale` when no fresh events arrive within the configured window.
+**Self-hosted network connectivity monitor with a live dashboard, outage history, and provider-aware failover controls.**
+
+Network Sonar is a local-first monitoring tool for continuously probing external targets, storing each sample in SQLite, and exposing a real-time web interface over an Express + React stack. It is built for quiet background monitoring on a single machine or home lab host, with Docker as the primary deployment path.
+
+## Why Network Sonar?
+
+- **Local-first by default**: binds to `127.0.0.1` in the default Docker setup, so it is not exposed to your LAN unless you opt in.
+- **Live operational view**: the dashboard updates through Server-Sent Events instead of polling.
+- **Provider-aware monitoring**: track multiple upstream DNS or network providers, enable round-robin probing, and manage custom targets from the UI.
+- **Useful incident history**: raw samples are grouped into outage incidents so you can inspect downtime instead of reading every ping.
+- **Low-overhead persistence**: SQLite keeps deployment simple while still retaining history and settings.
 
 ## Features
 
-- Background monitoring on a configurable interval.
-- Worker-thread probe execution so network checks stay off the request path.
-- SQLite storage with retention-based cleanup.
-- Live dashboard updates through SSE, without manual refresh.
-- Timeline view for recent history with selectable time ranges.
-
-## Tech Stack
-
-- Backend: Node.js 22+, Express 5, better-sqlite3
-- Frontend: React 19, Vite
-- Language: TypeScript 5 with `strict` mode
-- Testing: Vitest, Supertest, Testing Library
-
-## Repository Layout
-
-```text
-backend/                 Express server, monitor scheduler, SQLite access
-backend/src/api/         REST and SSE routes
-backend/src/network/     Worker-thread monitor execution
-backend/src/services/    Status, history, and event coordination
-frontend/                React application and Vite config
-frontend/src/components/ Dashboard UI building blocks
-tests/                   unit, contract, and integration suites
-specs/                   feature specs and planning artifacts
-```
-
-## Requirements
-
-- Node.js 22 or newer
-- A working `ping` binary available on the host system
+- **Current status + stale detection** for active, stale, and no-data states
+- **Timeline heatmap** with `1h`, `6h`, `24h`, `7d`, and `30d` ranges
+- **Incident history** with grouped outages, durations, and resolved vs ongoing state
+- **Provider catalog** for Cloudflare, Google, Quad9, and OpenDNS targets
+- **Custom providers** with optional hosted logos
+- **Round-robin mode** to cycle through enabled providers
+- **Sensitivity controls** to confirm down/up states after multiple samples
+- **Runtime controls** to pause or resume monitoring without stopping the app
+- **Retention-based cleanup** for long-running installs
 
 ## Quick Start
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/) with Docker Compose support
+- A working `ping` binary on the host if you plan to run the app outside Docker
+
+### Option A: Published Container
+
+Run the latest image from [GHCR](https://ghcr.io/emlopezr/network-sonar):
+
+```bash
+docker run -d \
+  --name network-sonar \
+  -p 127.0.0.1:4044:4044 \
+  -e HOST=0.0.0.0 \
+  -e PORT=4044 \
+  -e MONITOR_DB_PATH=/data/network-sonar.sqlite \
+  -v network-sonar-data:/data \
+  --tmpfs /tmp \
+  --cap-drop ALL \
+  --cap-add NET_RAW \
+  --security-opt no-new-privileges:true \
+  ghcr.io/emlopezr/network-sonar:latest
+```
+
+Open **[http://127.0.0.1:4044](http://127.0.0.1:4044)**.
+
+### Option B: Source + Docker Compose
+
+This is the best path if you want the helper script, local config file, and an easier update flow.
+
+```bash
+git clone https://github.com/emlopezr/network-sonar.git
+cd network-sonar
+cp .env.example .env
+./sonar.sh start
+```
+
+Open **[http://127.0.0.1:4044](http://127.0.0.1:4044)**.
+
+Useful helper commands:
+
+```bash
+./sonar.sh logs
+./sonar.sh status
+./sonar.sh stop
+./sonar.sh down
+./sonar.sh update
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and adjust what you need. These are the main runtime variables:
+
+
+| Variable                        | Default                           | Description                                                           |
+| ------------------------------- | --------------------------------- | --------------------------------------------------------------------- |
+| `HOST`                          | `127.0.0.1`                       | Backend bind host outside Docker                                      |
+| `PORT`                          | `4044`                            | Backend port                                                          |
+| `APP_PORT`                      | `4044`                            | Published host port in Docker Compose                                 |
+| `DOCKER_PUBLISH_HOST`           | `127.0.0.1`                       | Docker bind host; change to `0.0.0.0` only if you want LAN exposure   |
+| `MONITOR_TARGETS`               | `1.1.1.1,8.8.8.8,1.0.0.1,8.8.4.4` | Comma-separated probe targets                                         |
+| `MONITOR_INTERVAL_SECONDS`      | `5`                               | Probe interval                                                        |
+| `MONITOR_RETENTION_DAYS`        | `30`                              | History retention window                                              |
+| `MONITOR_DB_PATH`               | `data/network-sonar.sqlite`       | SQLite file path                                                      |
+| `MONITOR_STALE_AFTER_SECONDS`   | `30`                              | When current data should be marked stale                              |
+| `MONITOR_NO_DATA_AFTER_SECONDS` | `30`                              | When the monitor should transition to no-data                         |
+| `MONITOR_PING_TIMEOUT_MS`       | `3000`                            | Timeout for each ping cycle                                           |
+| `MONITOR_PING_BINARY`           | `ping`                            | Ping executable name or path                                          |
+| `MONITOR_ROUND_ROBIN_ENABLED`   | `false`                           | Cycle through enabled providers instead of using one fixed target set |
+| `MONITOR_CONFIRM_DOWN_AFTER`    | `2`                               | Samples required before confirming down                               |
+| `MONITOR_CONFIRM_UP_AFTER`      | `2`                               | Samples required before confirming recovery                           |
+
+
+Notes:
+
+- `MONITOR_TARGET` is still supported as a single-target fallback, but `MONITOR_TARGETS` is the primary configuration path.
+- `MONITOR_DB_PATH` is resolved from the repository root when running outside Docker.
+- Custom provider logos accept `https://` URLs, plus local-only `http://127.0.0.1` and `http://localhost`.
+
+## Local Development
 
 Install dependencies:
 
@@ -45,243 +119,137 @@ Install dependencies:
 npm install
 ```
 
-Run backend and frontend in development mode:
+Start backend and frontend in development mode:
 
 ```bash
 npm run dev
 ```
 
-Default local URLs:
+Default dev URLs:
 
-- Frontend dev server: `http://127.0.0.1:5173`
+- Frontend: `http://127.0.0.1:5173`
 - Backend API: `http://127.0.0.1:4173`
 
-Build for production and start the backend serving the compiled frontend:
+Build and run the production bundle locally:
 
 ```bash
 npm run build
 npm run start
 ```
 
-Default runtime URL:
+Default production URL:
 
 - App runtime: `http://127.0.0.1:4044`
 
-## Docker Runtime
-
-The official installation path is Docker Compose. It keeps the app running in the background, stores SQLite data in a named volume, and binds locally by default.
-
-### Run from GHCR
-
-If you only want to run the published image and do not need the source code locally:
-
-```bash
-docker pull ghcr.io/emlopezr/network-sonar:latest
-docker run -d \
-  --name network-sonar \
-  -p 127.0.0.1:4044:4044 \
-  -e HOST=0.0.0.0 \
-  -e PORT=4044 \
-  -e MONITOR_DB_PATH=/data/network-sonar.sqlite \
-  -v network-sonar-data:/data \
-  --tmpfs /tmp \
-  --cap-drop ALL \
-  --cap-add NET_RAW \
-  --security-opt no-new-privileges:true \
-  ghcr.io/emlopezr/network-sonar:latest
-```
-
-Open:
-
-- `http://127.0.0.1:4044`
-
-Update to the latest published version:
-
-```bash
-docker pull ghcr.io/emlopezr/network-sonar:latest
-docker stop network-sonar
-docker rm network-sonar
-docker run -d \
-  --name network-sonar \
-  -p 127.0.0.1:4044:4044 \
-  -e HOST=0.0.0.0 \
-  -e PORT=4044 \
-  -e MONITOR_DB_PATH=/data/network-sonar.sqlite \
-  -v network-sonar-data:/data \
-  --tmpfs /tmp \
-  --cap-drop ALL \
-  --cap-add NET_RAW \
-  --security-opt no-new-privileges:true \
-  ghcr.io/emlopezr/network-sonar:latest
-```
-
-### Install and keep it running
-
-1. Install Docker Desktop (Windows/macOS) or Docker Engine + Compose plugin (Linux).
-2. Clone this repository and enter it:
-
-```bash
-git clone <your-repo-url>
-cd network-sonar
-```
-
-3. Create your local config file:
-
-```bash
-cp .env.example .env
-```
-
-4. Start the app in the background:
-
-```bash
-./sonar.sh start
-```
-
-5. Open the app:
+## Architecture
 
 ```text
-http://127.0.0.1:4044
+┌────────────────────────────────────────────────────────────────┐
+│                         Network Sonar                          │
+├──────────────────────┬──────────────────────┬──────────────────┤
+│ Frontend             │ Backend              │ Storage          │
+│ React + Vite         │ Express + TS         │ SQLite           │
+│                      │                      │                  │
+│ Dashboard            │ REST bootstrap       │ Samples          │
+│ Incidents            │ SSE event stream     │ Incident history │
+│ Provider config      │ Monitor scheduler    │ Settings/runtime │
+│ Runtime controls     │ Worker-thread probes │ Retention state  │
+└──────────────────────┴──────────────────────┴──────────────────┘
 ```
 
-6. Confirm it is running:
+How it works:
+
+1. The backend loads config, runs migrations, and starts the monitor scheduler.
+2. Each cycle launches a worker-thread probe against the current target/provider.
+3. Samples are stored in SQLite and published to the UI through SSE.
+4. The frontend bootstraps over REST, then stays current from the live stream.
+5. Incident and provider views reuse the same stored history and monitor settings.
+
+## API Overview
+
+Core endpoints:
+
+- `GET /health`: liveness check
+- `GET /api/v1/bootstrap?range=1h|6h|24h|7d|30d`: current snapshot, history, timeline segments, settings, and runtime
+- `GET /api/v1/history?from=<unix>&to=<unix>`: raw samples for a time window
+- `GET /api/v1/incidents?from=<unix>&to=<unix>`: grouped outage incidents for a time window
+- `GET /api/v1/events`: SSE stream for snapshots, samples, settings, runtime, and heartbeats
+- `GET /api/v1/monitor/settings`: current provider and sensitivity settings
+- `PATCH /api/v1/monitor/settings`: update round-robin mode or confirmation thresholds
+- `PATCH /api/v1/monitor/runtime`: switch monitoring between `running` and `paused`
+
+Provider management:
+
+- `POST /api/v1/monitor/providers`
+- `PATCH /api/v1/monitor/providers/:providerId`
+- `PATCH /api/v1/monitor/providers/order`
+- `DELETE /api/v1/monitor/providers/:providerId`
+
+## Available Commands
+
+- `npm run dev`: start backend and frontend workspaces in parallel
+- `npm run build`: build both workspaces
+- `npm run start`: serve the built frontend from the backend
+- `npm run lint`: run ESLint across backend, frontend, and tests
+- `npm run typecheck`: run strict TypeScript checks for the full workspace
+- `npm test`: run unit, contract, and integration suites
+- `npm run test:unit`: run unit tests only
+- `npm run test:contract`: run API and stream contract tests
+- `npm run test:integration`: run integration tests only
+
+## Validation
+
+Recommended validation before publishing changes:
 
 ```bash
-./sonar.sh status
-./sonar.sh logs
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
 
-### Automatic startup after reboot
+## Troubleshooting
 
-The Compose file uses `restart: unless-stopped`, so Network Sonar will start again automatically after a reboot as long as Docker itself starts with the system.
+### The app shows no fresh data
 
-- Docker Desktop: enable "Start Docker Desktop when you log in".
-- Linux with Docker Engine: make sure the Docker service is enabled on boot.
-- If you stop the container manually with `docker compose stop`, it stays stopped until you start it again.
+- Check whether monitoring is paused in the UI.
+- Confirm the target list is valid and reachable from the host/container.
+- Verify the `ping` binary exists and is executable.
 
-### Update the installation
+### Docker container starts but probing fails
 
-Pull the latest code and rebuild the container:
+The container requires `NET_RAW` so `ping` can run. If you remove that capability, probing will fail.
 
-```bash
-./sonar.sh update
-```
+### I want LAN access
 
-Your SQLite data is kept in the Docker volume, so updates do not wipe the history.
-
-### Stop or remove it
-
-Stop the app but keep data:
-
-```bash
-./sonar.sh stop
-```
-
-Stop and remove the container but keep data:
-
-```bash
-./sonar.sh down
-```
-
-Stop and remove everything including saved SQLite data:
-
-```bash
-docker compose down -v
-```
-
-### Local-only by default
-
-The default installation publishes only to `127.0.0.1`, so it is not exposed to your LAN unless you explicitly change it.
-
-If you really want LAN access, set this in `.env` and restart:
+Set this in `.env` and restart:
 
 ```bash
 DOCKER_PUBLISH_HOST=0.0.0.0
 ./sonar.sh start
 ```
 
-This is not the default because 1.0 is local-first and does not add authentication.
+This is intentionally not the default because the app does not include authentication.
 
-```bash
-cp .env.example .env
-./sonar.sh start
-```
-
-Open:
-
-- `http://127.0.0.1:4044`
-
-Useful commands:
+### I need to inspect logs
 
 ```bash
 ./sonar.sh logs
-./sonar.sh down
-./sonar.sh start
-./sonar.sh update
 ```
 
-Notes:
-
-- SQLite persists in the `network-sonar-data` Docker volume.
-- The container only publishes to `127.0.0.1` by default.
-- To expose it to your LAN intentionally, set `DOCKER_PUBLISH_HOST=0.0.0.0` in `.env`.
-
-## Available Commands
-
-- `npm run dev`: start backend and frontend workspaces in parallel
-- `npm run build`: build `frontend/dist` and `backend/dist`
-- `npm run start`: run the compiled backend server
-- `npm run lint`: run ESLint across the repo
-- `npm run typecheck`: run strict TypeScript checks for backend, frontend, and tests
-- `npm test`: run unit, contract, and integration suites
-- `npm run test:unit`: run isolated unit tests
-- `npm run test:contract`: verify HTTP and stream contracts
-- `npm run test:integration`: run end-to-end integration coverage
-
-## Configuration
-
-Create a root `.env` file to override defaults:
+Or, if you started the container manually:
 
 ```bash
-HOST=127.0.0.1
-PORT=4044
-MONITOR_TARGET=1.1.1.1
-MONITOR_INTERVAL_SECONDS=5
-MONITOR_RETENTION_DAYS=30
-MONITOR_DB_PATH=data/network-sonar.sqlite
-MONITOR_STALE_AFTER_SECONDS=30
-MONITOR_NO_DATA_AFTER_SECONDS=30
-MONITOR_PING_TIMEOUT_MS=3000
-MONITOR_PING_BINARY=ping
+docker logs -f network-sonar
 ```
 
-Notes:
+## Contributing
 
-- `MONITOR_DB_PATH` is resolved from the repository root.
-- `MONITOR_STALE_AFTER_SECONDS` and `MONITOR_NO_DATA_AFTER_SECONDS` default to 30 seconds in Docker.
-- In production, the backend serves the built frontend from `frontend/dist`.
-- Custom provider logo URLs must use `https://`, except for local-only `http://localhost` or `http://127.0.0.1`.
-
-## API Overview
-
-- `GET /health`: simple liveness response with the current server timestamp
-- `GET /api/v1/bootstrap?range=1h|6h|24h|7d|30d`: current snapshot plus initial history
-- `GET /api/v1/history?from=<unix>&to=<unix>`: historical samples for a requested window
-- `GET /api/v1/events`: SSE stream emitting `snapshot`, `sample`, and `heartbeat` events
-
-## How It Works
-
-1. The backend starts a scheduler and initializes the SQLite-backed repository.
-2. Each cycle launches a worker thread that runs the external connectivity probe.
-3. The resulting sample is persisted, current status is updated, and retention cleanup runs on schedule.
-4. The dashboard bootstraps over REST, then stays current through the SSE stream.
-
-## Validation
-
-Use the full local validation flow before opening a pull request:
+Contributions are welcome. For local validation, run:
 
 ```bash
+npm run lint
 npm run typecheck
 npm test
-npm run lint
-npm run build
 ```
+
