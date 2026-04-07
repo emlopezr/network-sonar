@@ -71,6 +71,50 @@ Default runtime URL:
 
 The official installation path is Docker Compose. It keeps the app running in the background, stores SQLite data in a named volume, and binds locally by default.
 
+### Run from GHCR
+
+If you only want to run the published image and do not need the source code locally:
+
+```bash
+docker pull ghcr.io/emlopezr/network-sonar:latest
+docker run -d \
+  --name network-sonar \
+  -p 127.0.0.1:4044:4044 \
+  -e HOST=0.0.0.0 \
+  -e PORT=4044 \
+  -e MONITOR_DB_PATH=/data/network-sonar.sqlite \
+  -v network-sonar-data:/data \
+  --tmpfs /tmp \
+  --cap-drop ALL \
+  --cap-add NET_RAW \
+  --security-opt no-new-privileges:true \
+  ghcr.io/emlopezr/network-sonar:latest
+```
+
+Open:
+
+- `http://127.0.0.1:4044`
+
+Update to the latest published version:
+
+```bash
+docker pull ghcr.io/emlopezr/network-sonar:latest
+docker stop network-sonar
+docker rm network-sonar
+docker run -d \
+  --name network-sonar \
+  -p 127.0.0.1:4044:4044 \
+  -e HOST=0.0.0.0 \
+  -e PORT=4044 \
+  -e MONITOR_DB_PATH=/data/network-sonar.sqlite \
+  -v network-sonar-data:/data \
+  --tmpfs /tmp \
+  --cap-drop ALL \
+  --cap-add NET_RAW \
+  --security-opt no-new-privileges:true \
+  ghcr.io/emlopezr/network-sonar:latest
+```
+
 ### Install and keep it running
 
 1. Install Docker Desktop (Windows/macOS) or Docker Engine + Compose plugin (Linux).
