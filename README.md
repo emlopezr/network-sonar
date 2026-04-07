@@ -90,7 +90,7 @@ cp .env.example .env
 4. Start the app in the background:
 
 ```bash
-docker compose up -d --build
+./sonar.sh start
 ```
 
 5. Open the app:
@@ -102,8 +102,8 @@ http://127.0.0.1:4044
 6. Confirm it is running:
 
 ```bash
-docker compose ps
-docker compose logs -f
+./sonar.sh status
+./sonar.sh logs
 ```
 
 ### Automatic startup after reboot
@@ -119,8 +119,7 @@ The Compose file uses `restart: unless-stopped`, so Network Sonar will start aga
 Pull the latest code and rebuild the container:
 
 ```bash
-git pull
-docker compose up -d --build
+./sonar.sh update
 ```
 
 Your SQLite data is kept in the Docker volume, so updates do not wipe the history.
@@ -130,13 +129,13 @@ Your SQLite data is kept in the Docker volume, so updates do not wipe the histor
 Stop the app but keep data:
 
 ```bash
-docker compose stop
+./sonar.sh stop
 ```
 
 Stop and remove the container but keep data:
 
 ```bash
-docker compose down
+./sonar.sh down
 ```
 
 Stop and remove everything including saved SQLite data:
@@ -153,14 +152,14 @@ If you really want LAN access, set this in `.env` and restart:
 
 ```bash
 DOCKER_PUBLISH_HOST=0.0.0.0
-docker compose up -d
+./sonar.sh start
 ```
 
 This is not the default because 1.0 is local-first and does not add authentication.
 
 ```bash
 cp .env.example .env
-docker compose up -d --build
+./sonar.sh start
 ```
 
 Open:
@@ -170,9 +169,10 @@ Open:
 Useful commands:
 
 ```bash
-docker compose logs -f
-docker compose down
-docker compose up -d --build
+./sonar.sh logs
+./sonar.sh down
+./sonar.sh start
+./sonar.sh update
 ```
 
 Notes:
@@ -204,7 +204,8 @@ MONITOR_TARGET=1.1.1.1
 MONITOR_INTERVAL_SECONDS=5
 MONITOR_RETENTION_DAYS=30
 MONITOR_DB_PATH=data/network-sonar.sqlite
-MONITOR_STALE_AFTER_SECONDS=15
+MONITOR_STALE_AFTER_SECONDS=30
+MONITOR_NO_DATA_AFTER_SECONDS=30
 MONITOR_PING_TIMEOUT_MS=3000
 MONITOR_PING_BINARY=ping
 ```
@@ -212,7 +213,7 @@ MONITOR_PING_BINARY=ping
 Notes:
 
 - `MONITOR_DB_PATH` is resolved from the repository root.
-- `MONITOR_STALE_AFTER_SECONDS` defaults to three times the monitor interval.
+- `MONITOR_STALE_AFTER_SECONDS` and `MONITOR_NO_DATA_AFTER_SECONDS` default to 30 seconds in Docker.
 - In production, the backend serves the built frontend from `frontend/dist`.
 - Custom provider logo URLs must use `https://`, except for local-only `http://localhost` or `http://127.0.0.1`.
 
