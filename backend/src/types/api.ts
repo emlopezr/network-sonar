@@ -4,8 +4,13 @@ export const rangePresets = ["1h", "6h", "24h", "7d", "30d"] as const;
 export type RangePreset = (typeof rangePresets)[number];
 export type OutageIncidentStatus = "ongoing" | "resolved";
 export type TimelineSegmentStatus = "ok" | "down" | "no_data";
+export type MonitorRuntimeMode = "running" | "paused";
 export type MonitorProviderCompany = "Cloudflare" | "Google" | "Quad9" | "OpenDNS";
 export type MonitorProviderKind = "default" | "custom";
+
+export interface MonitorRuntime {
+  mode: MonitorRuntimeMode;
+}
 
 export interface MonitorProviderSeed {
   target: string;
@@ -39,6 +44,7 @@ export interface BootstrapResponse {
   retentionDays: number;
   sampleIntervalSeconds: number;
   monitorSettings: MonitorSettings;
+  monitorRuntime: MonitorRuntime;
 }
 
 export interface HistoryResponse {
@@ -113,4 +119,8 @@ export interface UpdateMonitorProviderRequest {
 
 export interface ReorderMonitorProvidersRequest {
   providerIds: number[];
+}
+
+export interface UpdateMonitorRuntimeRequest {
+  mode: MonitorRuntimeMode;
 }

@@ -18,6 +18,7 @@ export function initializeDatabase(dbPath: string): Database.Database {
 
   ensureMonitorProvidersLogoUrlColumn(database);
   ensureMonitorSettingsConfirmationColumns(database);
+  ensureMonitorSettingsRuntimeColumn(database);
   ensureMonitorSensitivityRevisionsTable(database);
   ensureMonitorStateTransitionsTable(database);
 
@@ -128,6 +129,16 @@ function ensureMonitorSettingsConfirmationColumns(database: Database.Database): 
 
   if (!columns.some((column) => column.name === "confirm_up_after")) {
     database.exec("ALTER TABLE monitor_settings ADD COLUMN confirm_up_after INTEGER NOT NULL DEFAULT 2");
+  }
+}
+
+function ensureMonitorSettingsRuntimeColumn(database: Database.Database): void {
+  const columns = database
+    .prepare("PRAGMA table_info(monitor_settings)")
+    .all() as Array<{ name: string }>;
+
+  if (!columns.some((column) => column.name === "is_paused")) {
+    database.exec("ALTER TABLE monitor_settings ADD COLUMN is_paused INTEGER NOT NULL DEFAULT 0");
   }
 }
 

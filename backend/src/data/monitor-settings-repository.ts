@@ -5,16 +5,18 @@ import type {
   MonitorSensitivityRevision
 } from "../types/monitor";
 import type {
+  MonitorRuntime,
   MonitorProviderKind,
   MonitorProviderRecord,
   MonitorProviderSeed
 } from "../types/api";
-import type { MonitorSettingsStore } from "../types/storage";
+import type { MonitorRuntimeStore, MonitorSettingsStore } from "../types/storage";
 
 interface MonitorSettingsRow {
   round_robin_enabled: number;
   confirm_down_after: number;
   confirm_up_after: number;
+  is_paused: number;
 }
 
 interface MonitorProviderRow {
@@ -51,10 +53,12 @@ function mapProviderRow(row: MonitorProviderRow): MonitorProviderRecord {
   };
 }
 
-export class MonitorSettingsRepository {
+export class MonitorSettingsRepository implements MonitorRuntimeStore {
   private readonly insertSettingsStatement;
 
   private readonly updateSettingsStatement;
+
+  private readonly updateRuntimeStatement;
 
   private readonly settingsStatement;
 
@@ -90,13 +94,15 @@ export class MonitorSettingsRepository {
         id,
         round_robin_enabled,
         confirm_down_after,
-        confirm_up_after
+        confirm_up_after,
+        is_paused
       )
       VALUES (
         1,
         @round_robin_enabled,
         @confirm_down_after,
-        @confirm_up_after
+        @confirm_up_after,
+        0
       )
     `);
     this.updateSettingsStatement = this.database.prepare(`
@@ -107,8 +113,14 @@ export class MonitorSettingsRepository {
           updated_at = unixepoch()
       WHERE id = 1
     `);
+    this.updateRuntimeStatement = this.database.prepare(`
+      UPDATE monitor_settings
+      SET is_paused = @is_paused,
+          updated_at = unixepoch()
+      WHERE id = 1
+    `);
     this.settingsStatement = this.database.prepare(`
-      SELECT round_robin_enabled, confirm_down_after, confirm_up_after
+      SELECT round_robin_enabled, confirm_down_after, confirm_up_after, is_paused
       FROM monitor_settings
       WHERE id = 1
       LIMIT 1
@@ -244,7 +256,16 @@ export class MonitorSettingsRepository {
     return {
       roundRobinEnabled: Boolean(row.round_robin_enabled),
       confirmDownAfter: row.confirm_down_after,
-      confirmUpAfter: row.confirm_up_after
+      confirmUpAfter: row.confirm_up_after,
+      isPaused: Boolean(row.is_paused)
+    };
+  }
+
+  public getRuntime(): MonitorRuntime {
+    const settings = this.getSettings();
+
+    return {
+      mode: settings.isPaused ? "paused" : "running"
     };
   }
 
@@ -253,6 +274,12 @@ export class MonitorSettingsRepository {
       round_robin_enabled: settings.roundRobinEnabled ? 1 : 0,
       confirm_down_after: settings.confirmDownAfter,
       confirm_up_after: settings.confirmUpAfter
+    });
+  }
+
+  public updateRuntime(mode: MonitorRuntime["mode"]): void {
+    this.updateRuntimeStatement.run({
+      is_paused: mode === "paused" ? 1 : 0
     });
   }
 

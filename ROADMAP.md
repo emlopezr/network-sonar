@@ -66,7 +66,7 @@ La 1.0.0 debe ser:
 
 ## Roadmap por historias/épicas
 
-## 1. Modelo de estado y confirmación de incidentes
+## 1. [DONE] Modelo de estado y confirmación de incidentes
 
 Estado: `hecho`
 
@@ -124,7 +124,7 @@ Como usuario, quiero que la app no marque una caída por un único ping aislado 
 - una recuperación aislada no cierra un incidente
 - los incidentes empiezan y terminan con reglas consistentes
 
-## 2. Timeline segmentada por cambios de estado
+## 2. [DONE] Timeline segmentada por cambios de estado
 
 Estado: `hecho`
 
@@ -285,97 +285,7 @@ Como usuario, quiero poder pausar o reanudar el monitoreo sin cerrar la app, par
 - la app deja de medir cuando está pausada
 - la timeline refleja ese tramo como `NO DATA`
 
-## 5. Resúmenes útiles: uptime, downtime e incidentes
-
-### Historia / problema
-
-Como usuario, quiero entender la estabilidad general de mi conexión sin tener que inspeccionar punto por punto.
-
-### Qué cubre esta historia
-
-- métricas resumidas
-- KPIs simples de estabilidad
-- valor práctico del dashboard e incidents page
-
-### Decisiones de diseño ya tomadas
-
-- se quiere mantener la app ligera
-- sí valen unas pocas funciones extra de utilidad
-- uptime y downtime sí entran en la 1.0
-
-### Qué falta implementar
-
-- uptime 24h
-- uptime 7d
-- downtime acumulado
-- conteo de incidentes por rango
-- duración del incidente actual o último incidente
-- “última conectividad confirmada”
-
-### Dependencias
-
-- depende de la historia 1 ya cerrada para que incidentes y “última conectividad confirmada” sean consistentes
-
-### Notas de consistencia
-
-- uptime/downtime deben salir de transiciones confirmadas, no del ratio bruto de muestras `ok/down`
-- si se expone una métrica por rango, debe dejar claro cómo trata `NO DATA`
-
-### Dudas por aclarar
-
-- si las métricas se calculan online o preagregadas
-- qué rango mostrar por defecto en cada métrica
-
-### Trabajo diferido
-
-- métricas más sofisticadas tipo MTTR/MTBF
-- comparativas complejas por provider
-
-### Criterio de cierre
-
-- el dashboard responde claramente “qué tan estable ha estado mi internet”
-
-## 6. Exportación simple de historial e incidentes
-
-### Historia / problema
-
-Como usuario, quiero exportar datos para guardarlos o revisarlos fuera de la app.
-
-### Qué cubre esta historia
-
-- export JSON
-- export CSV
-
-### Decisiones de diseño ya tomadas
-
-- exportación simple sí entra en 1.0
-- no hace falta sistema complejo de reporting
-
-### Qué falta implementar
-
-- endpoint o acción de export de incidentes
-- endpoint o acción de export de historial
-- formato mínimo consistente
-
-### Dependencias
-
-- conviene hacerlo después de definir el modelo estable de historial y segmentos
-
-### Notas de consistencia
-
-- export JSON/CSV debe poder distinguir entre muestras crudas, incidentes confirmados y futuros segmentos
-- no exportar incidentes recalculados con umbrales actuales si pertenecen a revisiones históricas distintas
-
-### Dudas por aclarar
-
-- si se exportan muestras, segmentos o ambas cosas
-- si la exportación se limita al rango visible
-
-### Criterio de cierre
-
-- un usuario puede llevarse sus datos en JSON o CSV sin fricción
-
-## 7. Packaging oficial con Docker
+## 5. Packaging oficial con Docker
 
 ### Historia / problema
 
@@ -426,7 +336,7 @@ Como usuario, quiero instalar la app rápido y dejarla siempre corriendo, sin te
 - la DB persiste reinicios
 - la app puede quedarse corriendo sin intervención manual constante
 
-## 8. Pulido de UI y consolidación visual
+## 6. Pulido de UI y consolidación visual
 
 ### Historia / problema
 
@@ -478,7 +388,7 @@ Como usuario, quiero una interfaz clara, consistente y rápida, que se sienta co
 - la UI se ve consistente entre dashboard, incidents y providers
 - la app sigue sintiéndose ligera y rápida
 
-## 9. Refactors de base y consolidación técnica
+## 7. Refactors de base y consolidación técnica
 
 ### Historia / problema
 
@@ -522,7 +432,7 @@ Como mantenedor, quiero una base de código más limpia y menos duplicada, para 
 - cambios futuros cuestan menos
 - la base está alineada con el producto real
 
-## 10. Seguridad y hardening local-first
+## 8. Seguridad y hardening local-first
 
 ### Historia / problema
 

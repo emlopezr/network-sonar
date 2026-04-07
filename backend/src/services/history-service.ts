@@ -21,6 +21,7 @@ export class HistoryService {
     const transitions = this.transitionRepository.listRange(from, to);
     const previousTransition = this.transitionRepository.getLatestBeforeOrAt(Math.max(0, from - 1));
     const segments: TimelineSegment[] = [];
+    const gapThresholdSeconds = this.sampleIntervalSeconds * 2;
 
     let activeTransition = previousTransition;
 
@@ -30,22 +31,24 @@ export class HistoryService {
 
     for (const transition of transitions) {
       if (activeTransition) {
-        const segment = this.buildTimelineSegment(activeTransition, transition.effectiveAt, from, to);
-
-        if (segment) {
-          segments.push(segment);
-        }
+        segments.push(
+          ...this.buildTimelineSegments(
+            activeTransition,
+            transition.effectiveAt,
+            from,
+            to,
+            gapThresholdSeconds
+          )
+        );
       }
 
       activeTransition = transition;
     }
 
     if (activeTransition) {
-      const segment = this.buildTimelineSegment(activeTransition, null, from, to);
-
-      if (segment) {
-        segments.push(segment);
-      }
+      segments.push(
+        ...this.buildTimelineSegments(activeTransition, null, from, to, gapThresholdSeconds)
+      );
     }
 
     return segments;
@@ -119,41 +122,164 @@ export class HistoryService {
     return transitions;
   }
 
-  private buildTimelineSegment(
+  private buildTimelineSegments(
     transition: MonitorStateTransition,
     nextTransitionAt: number | null,
     from: number,
-    to: number
+    to: number,
+    gapThresholdSeconds: number
+  ): TimelineSegment[] {
+    const samples = this.repository
+      .getRange(transition.effectiveAt, nextTransitionAt ?? to)
+      .filter((sample) => nextTransitionAt === null || sample.observedAt < nextTransitionAt);
+    const segments: TimelineSegment[] = [];
+
+    if (samples.length === 0) {
+      const fallbackSegment = this.buildSingleTimelineSegment(
+        transition.status,
+        transition.effectiveAt,
+        nextTransitionAt,
+        from,
+        to,
+        0,
+        null,
+        transition.effectiveAt,
+        nextTransitionAt
+      );
+
+      return fallbackSegment ? [fallbackSegment] : [];
+    }
+
+    let segmentCursor = transition.effectiveAt;
+    let segmentSamples: PersistedMonitorSample[] = [];
+
+    for (let index = 0; index < samples.length; index += 1) {
+      const sample = samples[index]!;
+      const nextSample = samples[index + 1] ?? null;
+      segmentSamples.push(sample);
+
+      const gapToNextSample = nextSample ? nextSample.observedAt - sample.observedAt : null;
+      const hasNoDataGap = gapToNextSample !== null && gapToNextSample > gapThresholdSeconds;
+
+      if (hasNoDataGap) {
+        const stateSegment = this.buildSingleTimelineSegment(
+          transition.status,
+          segmentCursor,
+          sample.observedAt + this.sampleIntervalSeconds,
+          from,
+          to,
+          segmentSamples.length,
+          segmentSamples[segmentSamples.length - 1] ?? null,
+          transition.effectiveAt,
+          nextTransitionAt
+        );
+
+        if (stateSegment) {
+          segments.push(stateSegment);
+        }
+
+        const noDataStart = sample.observedAt + this.sampleIntervalSeconds;
+        const noDataSegment = this.buildSingleTimelineSegment(
+          "no_data",
+          noDataStart,
+          nextSample!.observedAt,
+          from,
+          to,
+          0,
+          null,
+          transition.effectiveAt,
+          nextTransitionAt
+        );
+
+        if (noDataSegment) {
+          segments.push(noDataSegment);
+        }
+
+        segmentCursor = nextSample!.observedAt;
+        segmentSamples = [];
+      }
+    }
+
+    const lastSample = samples[samples.length - 1]!;
+    const nominalSegmentEnd = nextTransitionAt ?? to;
+    const trailingGapStart = lastSample.observedAt + this.sampleIntervalSeconds;
+    const hasTrailingNoData =
+      trailingGapStart <= nominalSegmentEnd &&
+      nominalSegmentEnd - lastSample.observedAt > gapThresholdSeconds;
+    const stateSegmentEnd = hasTrailingNoData ? trailingGapStart : nominalSegmentEnd;
+
+    const finalStateSegment = this.buildSingleTimelineSegment(
+      transition.status,
+      segmentCursor,
+      stateSegmentEnd,
+      from,
+      to,
+      segmentSamples.length,
+      segmentSamples[segmentSamples.length - 1] ?? null,
+      transition.effectiveAt,
+      nextTransitionAt
+    );
+
+    if (finalStateSegment) {
+      segments.push(finalStateSegment);
+    }
+
+    if (hasTrailingNoData) {
+      const trailingNoData = this.buildSingleTimelineSegment(
+        "no_data",
+        trailingGapStart,
+        nextTransitionAt,
+        from,
+        to,
+        0,
+        null,
+        transition.effectiveAt,
+        nextTransitionAt
+      );
+
+      if (trailingNoData) {
+        segments.push(trailingNoData);
+      }
+    }
+
+    return segments;
+  }
+
+  private buildSingleTimelineSegment(
+    status: TimelineSegment["status"],
+    startedAt: number,
+    endedAt: number | null,
+    from: number,
+    to: number,
+    sampleCount: number,
+    lastSample: PersistedMonitorSample | null,
+    transitionStartedAt: number,
+    nextTransitionAt: number | null
   ): TimelineSegment | null {
-    const visibleStart = Math.max(transition.effectiveAt, from);
-    const visibleEnd = Math.min(nextTransitionAt ?? to, to);
+    const visibleStart = Math.max(startedAt, from);
+    const visibleEnd = Math.min(endedAt ?? to, to);
 
     if (visibleEnd < visibleStart) {
       return null;
     }
 
-    if (visibleEnd === visibleStart && nextTransitionAt !== null) {
+    if (visibleEnd === visibleStart && endedAt !== null) {
       return null;
     }
 
-    const samples = this.repository
-      .getRange(transition.effectiveAt, nextTransitionAt ?? to)
-      .filter((sample) => nextTransitionAt === null || sample.observedAt < nextTransitionAt);
-    const lastSample = samples[samples.length - 1] ?? null;
-
     return {
-      status: transition.status,
-      startedAt: transition.effectiveAt,
-      endedAt: nextTransitionAt,
+      status,
+      startedAt,
+      endedAt,
       visibleStart,
       visibleEnd,
       durationSeconds: Math.max(0, visibleEnd - visibleStart),
-      sampleCount: samples.length,
+      sampleCount,
       lastObservedAt: lastSample?.observedAt ?? null,
       latestFailureReason: lastSample?.failureReason ?? null,
       latestLatencyMs: lastSample?.externalLatencyMs ?? null,
-      startedBeforeRange: transition.effectiveAt < from,
-      endsAfterRange: nextTransitionAt === null || nextTransitionAt > to
+      startedBeforeRange: startedAt < from || transitionStartedAt < from,
+      endsAfterRange: endedAt === null || endedAt > to || nextTransitionAt === null
     };
   }
 }

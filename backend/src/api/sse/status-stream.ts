@@ -3,6 +3,7 @@ import { Router } from "express";
 
 import type { CurrentStatusService } from "../../services/current-status-service";
 import type { MonitorEventBus } from "../../services/event-bus";
+import type { MonitorRuntimeService } from "../../services/monitor-runtime-service";
 import type { MonitorSettingsService } from "../../services/monitor-settings-service";
 
 function writeEvent(response: Response, eventName: string, payload: unknown): void {
@@ -14,7 +15,8 @@ export function createStatusStreamRouter(
   currentStatusService: CurrentStatusService,
   eventBus: MonitorEventBus,
   heartbeatSeconds: number,
-  monitorSettingsService: MonitorSettingsService
+  monitorSettingsService: MonitorSettingsService,
+  monitorRuntimeService: MonitorRuntimeService
 ): Router {
   const router = Router();
 
@@ -32,6 +34,9 @@ export function createStatusStreamRouter(
     writeEvent(response, "settings", {
       monitorSettings: monitorSettingsService.getSettings()
     });
+    writeEvent(response, "runtime", {
+      monitorRuntime: monitorRuntimeService.getRuntime()
+    });
 
     const unsubscribeSnapshot = eventBus.subscribe("snapshot", (snapshot) => {
       writeEvent(response, "snapshot", { current: snapshot });
@@ -41,6 +46,9 @@ export function createStatusStreamRouter(
     });
     const unsubscribeSettings = eventBus.subscribe("settings", (settings) => {
       writeEvent(response, "settings", { monitorSettings: settings });
+    });
+    const unsubscribeRuntime = eventBus.subscribe("runtime", (runtime) => {
+      writeEvent(response, "runtime", { monitorRuntime: runtime });
     });
 
     const heartbeat = setInterval(() => {
@@ -52,6 +60,7 @@ export function createStatusStreamRouter(
       unsubscribeSnapshot();
       unsubscribeSample();
       unsubscribeSettings();
+      unsubscribeRuntime();
       response.end();
     });
   });

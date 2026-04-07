@@ -37,8 +37,8 @@ export function Legend({ compact = false }: { compact?: boolean }) {
       <li>
         <i className="legend__swatch legend__swatch--stale" aria-hidden="true" />
         <span>
-          <strong>No recent data</strong>
-          No new samples arrived before the freshness threshold.
+          <strong>No Data</strong>
+          No real measurement was recorded during that period.
         </span>
       </li>
     </ul>

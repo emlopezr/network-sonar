@@ -102,7 +102,8 @@ export class MonitorSettingsService {
     const nextSettings = {
       roundRobinEnabled: patch.roundRobinEnabled ?? current.roundRobinEnabled,
       confirmDownAfter: patch.confirmDownAfter ?? current.confirmDownAfter,
-      confirmUpAfter: patch.confirmUpAfter ?? current.confirmUpAfter
+      confirmUpAfter: patch.confirmUpAfter ?? current.confirmUpAfter,
+      isPaused: current.isPaused
     };
 
     this.repository.updateSettings(nextSettings);

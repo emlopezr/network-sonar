@@ -1,12 +1,13 @@
 import { EventEmitter } from "node:events";
 
-import type { MonitorSettings } from "../types/api";
+import type { MonitorRuntime, MonitorSettings } from "../types/api";
 import type { CurrentStatusSnapshot, PersistedMonitorSample } from "../types/monitor";
 
 type EventMap = {
   snapshot: CurrentStatusSnapshot;
   sample: PersistedMonitorSample;
   settings: MonitorSettings;
+  runtime: MonitorRuntime;
 };
 
 export class MonitorEventBus {
@@ -22,6 +23,10 @@ export class MonitorEventBus {
 
   public publishSettings(settings: MonitorSettings): void {
     this.emitter.emit("settings", settings);
+  }
+
+  public publishRuntime(runtime: MonitorRuntime): void {
+    this.emitter.emit("runtime", runtime);
   }
 
   public subscribe<EventName extends keyof EventMap>(

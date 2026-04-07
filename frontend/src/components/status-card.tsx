@@ -1,4 +1,4 @@
-import type { CurrentStatusSnapshot } from "../types/monitor";
+import type { CurrentStatusSnapshot, MonitorRuntime } from "../types/monitor";
 
 type StreamState = "connecting" | "live" | "reconnecting";
 
@@ -52,11 +52,13 @@ function getHeadline(status: CurrentStatusSnapshot["status"]): string {
 
 export function StatusCard({
   snapshot,
+  monitorRuntime,
   streamState,
   lastEventAt,
   operationalRate
 }: {
   snapshot: CurrentStatusSnapshot | null;
+  monitorRuntime: MonitorRuntime;
   streamState: StreamState;
   lastEventAt: number | null;
   operationalRate: string;
@@ -65,9 +67,10 @@ export function StatusCard({
     return (
       <section className="status-hero status-hero--pending">
         <div className="status-hero__primary">
-          <span className="status-hero__label">Current state</span>
-          <h1>NO DATA</h1>
-          <p className="status-hero__meta mono">System stability: --</p>
+        <span className="status-hero__label">Current state</span>
+        <h1>NO DATA</h1>
+        <p className="status-hero__mode mono">Monitor: {monitorRuntime.mode.toUpperCase()}</p>
+        <p className="status-hero__meta mono">System stability: --</p>
         </div>
         <dl className="status-hero__secondary">
           <div className="status-hero__metric">
@@ -96,6 +99,7 @@ export function StatusCard({
       <div className="status-hero__primary">
         <span className="status-hero__label">Current state</span>
         <h1>{getHeadline(snapshot.status)}</h1>
+        <p className="status-hero__mode mono">Monitor: {monitorRuntime.mode.toUpperCase()}</p>
         <p className="status-hero__meta mono">System stability: {operationalRate}</p>
       </div>
       <dl className="status-hero__secondary">

@@ -11,6 +11,7 @@ import {
   fetchBootstrap,
   fetchHistory,
   fetchHistorySegments,
+  updateMonitorRuntime,
   updateMonitorSettings
 } from "../services/api-client";
 import { connectStatusStream } from "../services/status-stream";
@@ -20,6 +21,7 @@ import { getRangeSeconds } from "../utils/range";
 import type {
   BootstrapResponse,
   CurrentStatusSnapshot,
+  MonitorRuntime,
   MonitorSample,
   MonitorSettings,
   RangePreset,
@@ -33,6 +35,9 @@ const defaultMonitorSettings: MonitorSettings = {
   confirmDownAfter: 2,
   confirmUpAfter: 2,
   providers: []
+};
+const defaultMonitorRuntime: MonitorRuntime = {
+  mode: "running"
 };
 
 function normalizeMonitorSettings(settings: MonitorSettings | undefined): MonitorSettings {
@@ -195,8 +200,10 @@ export function Dashboard({
   const [lastEventAt, setLastEventAt] = useState<number | null>(null);
   const [liveMode, setLiveMode] = useState(true);
   const [monitorSettings, setMonitorSettings] = useState<MonitorSettings>(defaultMonitorSettings);
+  const [monitorRuntime, setMonitorRuntime] = useState<MonitorRuntime>(defaultMonitorRuntime);
   const [isProviderPanelOpen, setIsProviderPanelOpen] = useState(false);
   const [savingRoundRobin, setSavingRoundRobin] = useState(false);
+  const [savingRuntime, setSavingRuntime] = useState(false);
 
   const deferredSegments = useDeferredValue(historySegments);
   const rangeWindow = getRangeSeconds(range);
@@ -227,6 +234,7 @@ export function Dashboard({
           setRetentionDays(payload.retentionDays);
           setSampleIntervalSeconds(payload.sampleIntervalSeconds);
           setMonitorSettings(normalizeMonitorSettings(payload.monitorSettings));
+          setMonitorRuntime(payload.monitorRuntime);
         });
       } catch (loadError) {
         if (!cancelled) {
@@ -266,6 +274,10 @@ export function Dashboard({
         setMonitorSettings(normalizeMonitorSettings(payload.monitorSettings));
         setSavingRoundRobin(false);
       },
+      onRuntime: (payload) => {
+        setMonitorRuntime(payload.monitorRuntime);
+        setSavingRuntime(false);
+      },
       onSample: (payload) => {
         setHistory((previous) =>
           mergeHistorySample(previous, payload, payload.observedAt - rangeWindow)
@@ -291,7 +303,7 @@ export function Dashboard({
         }
 
         const now = Math.floor(Date.now() / 1000);
-        if (!shouldMarkSnapshotStale(previous, lastEventAt, now)) {
+        if (!shouldMarkSnapshotStale(previous, lastEventAt, now, monitorRuntime.mode !== "paused")) {
           return previous;
         }
 
@@ -305,7 +317,7 @@ export function Dashboard({
     return () => {
       window.clearInterval(timer);
     };
-  }, [lastEventAt]);
+  }, [lastEventAt, monitorRuntime.mode]);
 
   const from = Math.floor(Date.now() / 1000) - rangeWindow;
 
@@ -340,6 +352,26 @@ export function Dashboard({
     }
   }
 
+  async function handleRuntimeToggle(): Promise<void> {
+    try {
+      setSavingRuntime(true);
+      setError(null);
+      const updatedRuntime = await updateMonitorRuntime({
+        mode: monitorRuntime.mode === "running" ? "paused" : "running"
+      });
+      setMonitorRuntime(updatedRuntime);
+      await refreshHistory();
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Could not update the monitor runtime."
+      );
+    } finally {
+      setSavingRuntime(false);
+    }
+  }
+
   return (
     <AppShell
       activePage="dashboard"
@@ -361,6 +393,7 @@ export function Dashboard({
 
         <StatusCard
           snapshot={current}
+          monitorRuntime={monitorRuntime}
           streamState={streamState}
           lastEventAt={lastEventAt}
           operationalRate={getOperationalRate(history)}
@@ -403,6 +436,18 @@ export function Dashboard({
               onClick={() => void refreshHistory()}
             >
               Refresh
+            </button>
+            <button
+              type="button"
+              className={`control-bar__runtime mono${monitorRuntime.mode === "paused" ? " is-paused" : ""}`}
+              onClick={() => void handleRuntimeToggle()}
+              disabled={savingRuntime}
+            >
+              {savingRuntime
+                ? "Saving..."
+                : monitorRuntime.mode === "running"
+                  ? "Pause Monitor"
+                  : "Resume Monitor"}
             </button>
           </div>
         </section>

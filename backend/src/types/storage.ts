@@ -5,6 +5,7 @@ import type {
   MonitorStateTransition,
   PersistedMonitorSample
 } from "./monitor";
+import type { MonitorRuntime } from "./api";
 
 export interface StoredConnectionLog extends PersistedMonitorSample {
   id: number;
@@ -30,6 +31,7 @@ export interface TransitionStore {
 
 export interface MonitorSettingsStore extends ConfirmationThresholds {
   roundRobinEnabled: boolean;
+  isPaused: boolean;
 }
 
 export interface MonitorSettingsStoreReader {
@@ -40,4 +42,9 @@ export interface MonitorSettingsStoreReader {
 export interface MonitorReadModel {
   getCurrentSnapshot(now?: number): CurrentStatusSnapshot;
   getHistory(from: number, to: number): PersistedMonitorSample[];
+}
+
+export interface MonitorRuntimeStore {
+  getRuntime(): MonitorRuntime;
+  updateRuntime(mode: MonitorRuntime["mode"]): void;
 }

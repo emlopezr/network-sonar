@@ -9,6 +9,7 @@ import { MonitorScheduler } from "./network/monitor-scheduler";
 import { CurrentStatusService } from "./services/current-status-service";
 import { MonitorEventBus } from "./services/event-bus";
 import { HistoryService } from "./services/history-service";
+import { MonitorRuntimeService } from "./services/monitor-runtime-service";
 import { MonitorService } from "./services/monitor-service";
 import { MonitorSettingsService } from "./services/monitor-settings-service";
 
@@ -30,6 +31,10 @@ export function main(): void {
     config.monitor.intervalSeconds
   );
   const eventBus = new MonitorEventBus();
+  const monitorRuntimeService = new MonitorRuntimeService(
+    monitorSettingsRepository,
+    eventBus
+  );
   const monitorSettingsService = new MonitorSettingsService(
     monitorSettingsRepository,
     eventBus,
@@ -52,14 +57,16 @@ export function main(): void {
     config.monitor,
     monitorService,
     purgeService,
-    monitorSettingsService
+    monitorSettingsService,
+    monitorRuntimeService
   );
   const app = createApp({
     config,
     currentStatusService,
     historyService,
     eventBus,
-    monitorSettingsService
+    monitorSettingsService,
+    monitorRuntimeService
   });
 
   const server = app.listen(config.port, () => {

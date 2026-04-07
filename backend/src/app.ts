@@ -6,12 +6,14 @@ import { createBootstrapRouter } from "./api/routes/bootstrap";
 import { createHealthRouter } from "./api/routes/health";
 import { createHistoryRouter } from "./api/routes/history";
 import { createIncidentsRouter } from "./api/routes/incidents";
+import { createMonitorRuntimeRouter } from "./api/routes/monitor-runtime";
 import { createMonitorSettingsRouter } from "./api/routes/monitor-settings";
 import { createStatusStreamRouter } from "./api/sse/status-stream";
 import type { AppConfig } from "./config";
 import type { CurrentStatusService } from "./services/current-status-service";
 import type { MonitorEventBus } from "./services/event-bus";
 import type { HistoryService } from "./services/history-service";
+import type { MonitorRuntimeService } from "./services/monitor-runtime-service";
 import type { MonitorSettingsService } from "./services/monitor-settings-service";
 
 export interface AppDependencies {
@@ -20,6 +22,7 @@ export interface AppDependencies {
   historyService: HistoryService;
   eventBus: MonitorEventBus;
   monitorSettingsService: MonitorSettingsService;
+  monitorRuntimeService: MonitorRuntimeService;
 }
 
 export function createApp(dependencies: AppDependencies) {
@@ -34,18 +37,21 @@ export function createApp(dependencies: AppDependencies) {
       dependencies.historyService,
       dependencies.config.monitor.retentionDays,
       dependencies.config.monitor.intervalSeconds,
-      dependencies.monitorSettingsService
+      dependencies.monitorSettingsService,
+      dependencies.monitorRuntimeService
     )
   );
   app.use(createHistoryRouter(dependencies.historyService));
   app.use(createIncidentsRouter(dependencies.historyService));
   app.use(createMonitorSettingsRouter(dependencies.monitorSettingsService));
+  app.use(createMonitorRuntimeRouter(dependencies.monitorRuntimeService));
   app.use(
     createStatusStreamRouter(
       dependencies.currentStatusService,
       dependencies.eventBus,
       dependencies.config.monitor.heartbeatSeconds,
-      dependencies.monitorSettingsService
+      dependencies.monitorSettingsService,
+      dependencies.monitorRuntimeService
     )
   );
 

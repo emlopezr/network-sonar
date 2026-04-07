@@ -3,9 +3,11 @@ import type {
   CreateMonitorProviderRequest,
   IncidentHistoryResponse,
   HistoryResponse,
+  MonitorRuntime,
   MonitorSettings,
   ReorderMonitorProvidersRequest,
   TimelineSegmentsResponse,
+  UpdateMonitorRuntimeRequest,
   UpdateMonitorProviderRequest,
   UpdateMonitorSettingsRequest,
   RangePreset
@@ -65,6 +67,20 @@ export async function updateMonitorSettings(
   });
 
   return parseJsonResponse<MonitorSettings>(response);
+}
+
+export async function updateMonitorRuntime(
+  patch: UpdateMonitorRuntimeRequest
+): Promise<MonitorRuntime> {
+  const response = await fetch("/api/v1/monitor/runtime", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(patch)
+  });
+
+  return parseJsonResponse<MonitorRuntime>(response);
 }
 
 export async function fetchMonitorSettings(): Promise<MonitorSettings> {

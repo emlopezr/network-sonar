@@ -5,8 +5,13 @@ export type MonitorStatus = "ok" | "down";
 export type SnapshotStatus = MonitorStatus | "stale";
 export type OutageIncidentStatus = "ongoing" | "resolved";
 export type TimelineSegmentStatus = MonitorStatus | "no_data";
+export type MonitorRuntimeMode = "running" | "paused";
 export type MonitorProviderCompany = "Cloudflare" | "Google" | "Quad9" | "OpenDNS";
 export type MonitorProviderKind = "default" | "custom";
+
+export interface MonitorRuntime {
+  mode: MonitorRuntimeMode;
+}
 
 export interface MonitorProviderRecord {
   id: number;
@@ -54,6 +59,7 @@ export interface BootstrapResponse {
   retentionDays: number;
   sampleIntervalSeconds: number;
   monitorSettings: MonitorSettings;
+  monitorRuntime: MonitorRuntime;
 }
 
 export interface HistoryResponse {
@@ -110,6 +116,10 @@ export interface SettingsEventPayload {
   monitorSettings: MonitorSettings;
 }
 
+export interface RuntimeEventPayload {
+  monitorRuntime: MonitorRuntime;
+}
+
 export interface UpdateMonitorSettingsRequest {
   roundRobinEnabled?: boolean;
   confirmDownAfter?: number;
@@ -131,4 +141,8 @@ export interface UpdateMonitorProviderRequest {
 
 export interface ReorderMonitorProvidersRequest {
   providerIds: number[];
+}
+
+export interface UpdateMonitorRuntimeRequest {
+  mode: MonitorRuntimeMode;
 }

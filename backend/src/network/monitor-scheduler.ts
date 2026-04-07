@@ -1,6 +1,7 @@
 import { buildProbeOrder } from "./target-probe";
 import { runMonitorWorker } from "./monitor-worker";
 import type { PurgeService } from "../data/purge-service";
+import type { MonitorRuntimeService } from "../services/monitor-runtime-service";
 import type { MonitorSettingsService } from "../services/monitor-settings-service";
 import type { MonitorService } from "../services/monitor-service";
 import type { WorkerCycleRequest, WorkerCycleResult } from "../types/monitor";
@@ -23,6 +24,7 @@ export class MonitorScheduler {
     private readonly monitorService: MonitorService,
     private readonly purgeService: PurgeService,
     private readonly monitorSettingsService: MonitorSettingsService,
+    private readonly monitorRuntimeService: MonitorRuntimeService,
     private readonly workerRunner: WorkerRunner = runMonitorWorker
   ) {}
 
@@ -56,6 +58,10 @@ export class MonitorScheduler {
     try {
       const observedAt = Math.floor(Date.now() / 1000);
       this.purgeService.maybePurge(observedAt);
+      if (this.monitorRuntimeService.isPaused()) {
+        return;
+      }
+
       const monitorSettings = this.monitorSettingsService.getSettings();
       const activeTargets = monitorSettings.providers
         .filter((provider) => provider.isEnabled)

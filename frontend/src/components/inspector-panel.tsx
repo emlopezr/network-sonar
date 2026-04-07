@@ -54,6 +54,7 @@ export function InspectorPanel({
     segment.status === "ok" && segment.latestLatencyMs !== null
       ? `${segment.latestLatencyMs} ms`
       : "No data";
+  const samplesLabel = segment.status === "no_data" ? "No samples" : String(segment.sampleCount);
 
   return (
     <section className="inspector-panel inspector-panel--segment" aria-live="polite">
@@ -86,7 +87,7 @@ export function InspectorPanel({
         </div>
         <div>
           <dt>Samples</dt>
-          <dd className="mono">{segment.sampleCount}</dd>
+          <dd className="mono">{samplesLabel}</dd>
         </div>
         <div>
           <dt>Avg Latency</dt>

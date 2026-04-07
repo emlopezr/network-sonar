@@ -1,5 +1,6 @@
 import type {
   MonitorSample,
+  RuntimeEventPayload,
   SettingsEventPayload,
   SnapshotEventPayload
 } from "../types/monitor";
@@ -8,6 +9,7 @@ export interface StatusStreamHandlers {
   onOpen: () => void;
   onSnapshot: (payload: SnapshotEventPayload) => void;
   onSettings: (payload: SettingsEventPayload) => void;
+  onRuntime: (payload: RuntimeEventPayload) => void;
   onSample: (payload: MonitorSample) => void;
   onHeartbeat: (payload: { now: number }) => void;
   onError: () => void;
@@ -27,6 +29,9 @@ export function connectStatusStream(handlers: StatusStreamHandlers): () => void 
   });
   source.addEventListener("settings", (event) => {
     handlers.onSettings(parsePayload<SettingsEventPayload>(event as MessageEvent<string>));
+  });
+  source.addEventListener("runtime", (event) => {
+    handlers.onRuntime(parsePayload<RuntimeEventPayload>(event as MessageEvent<string>));
   });
   source.addEventListener("sample", (event) => {
     handlers.onSample(parsePayload<MonitorSample>(event as MessageEvent<string>));
