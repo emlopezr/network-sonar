@@ -114,6 +114,9 @@ describe("incidents page", () => {
               ],
               retentionDays: 30,
               sampleIntervalSeconds: 5,
+              monitorRuntime: {
+                mode: "running"
+              },
               monitorSettings: {
                 roundRobinEnabled: false,
                 confirmDownAfter: 2,

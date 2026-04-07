@@ -21,8 +21,10 @@ describe("GET /api/v1/events", () => {
     expect(chunk).toContain("retry: 5000");
     expect(chunk).toContain("event: snapshot");
     expect(chunk).toContain("event: settings");
+    expect(chunk).toContain("event: runtime");
     expect(chunk).toContain("\"status\":\"ok\"");
     expect(chunk).toContain("\"roundRobinEnabled\":false");
+    expect(chunk).toContain("\"mode\":\"running\"");
 
     harness.monitorService.processCycle(
       createCycle({

@@ -15,6 +15,11 @@ import type {
   MonitorSettingsRepository
 } from "../data/monitor-settings-repository";
 import { monitorProviderCatalog } from "./monitor-provider-catalog";
+import {
+  normalizeOptionalLogoUrl,
+  normalizeProviderLabel,
+  normalizeProviderTarget
+} from "./monitor-provider-validation";
 import type { MonitorEventBus } from "./event-bus";
 
 export class MonitorSettingsError extends Error {
@@ -24,36 +29,6 @@ export class MonitorSettingsError extends Error {
   ) {
     super(message);
   }
-}
-
-function normalizeText(value: string): string {
-  return value.trim();
-}
-
-function normalizeOptionalUrl(value: string | undefined): string | null {
-  if (value === undefined) {
-    return null;
-  }
-
-  const normalizedValue = normalizeText(value);
-
-  if (!normalizedValue) {
-    return null;
-  }
-
-  let parsedUrl: URL;
-
-  try {
-    parsedUrl = new URL(normalizedValue);
-  } catch {
-    throw new MonitorSettingsError("Logo URL must be a valid absolute URL.", 400);
-  }
-
-  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    throw new MonitorSettingsError("Logo URL must use http or https.", 400);
-  }
-
-  return parsedUrl.toString();
 }
 
 export class MonitorSettingsService {
@@ -122,13 +97,9 @@ export class MonitorSettingsService {
   }
 
   public createCustomProvider(request: CreateMonitorProviderRequest): MonitorSettings {
-    const label = normalizeText(request.label);
-    const target = normalizeText(request.target);
-    const logoUrl = normalizeOptionalUrl(request.logoUrl);
-
-    if (!label || !target) {
-      throw new MonitorSettingsError("Label and target are required.", 400);
-    }
+    const label = normalizeProviderLabel(request.label);
+    const target = normalizeProviderTarget(request.target);
+    const logoUrl = normalizeOptionalLogoUrl(request.logoUrl);
 
     if (this.repository.getProviderByTarget(target)) {
       throw new MonitorSettingsError("Target already exists.", 409);
@@ -151,19 +122,15 @@ export class MonitorSettingsService {
         throw new MonitorSettingsError("Default providers cannot be edited.", 400);
       }
 
-      const label = request.label !== undefined ? normalizeText(request.label) : provider.label;
-      const target = request.target !== undefined ? normalizeText(request.target) : provider.target;
+      const label = request.label !== undefined
+        ? normalizeProviderLabel(request.label)
+        : provider.label;
+      const target = request.target !== undefined
+        ? normalizeProviderTarget(request.target)
+        : provider.target;
       const logoUrl = request.logoUrl !== undefined
-        ? normalizeOptionalUrl(request.logoUrl)
+        ? normalizeOptionalLogoUrl(request.logoUrl)
         : provider.logoUrl;
-
-      if (!label) {
-        throw new MonitorSettingsError("Label must not be empty.", 400);
-      }
-
-      if (!target) {
-        throw new MonitorSettingsError("Target must not be empty.", 400);
-      }
 
       const existingProvider = this.repository.getProviderByTarget(target);
 

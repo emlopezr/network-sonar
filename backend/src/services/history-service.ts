@@ -133,18 +133,17 @@ export class HistoryService {
       .getRange(transition.effectiveAt, nextTransitionAt ?? to)
       .filter((sample) => nextTransitionAt === null || sample.observedAt < nextTransitionAt);
     const segments: TimelineSegment[] = [];
+    const isOpenTransition = nextTransitionAt === null;
 
     if (samples.length === 0) {
       const fallbackSegment = this.buildSingleTimelineSegment(
         transition.status,
         transition.effectiveAt,
-        nextTransitionAt,
+        isOpenTransition ? null : nextTransitionAt,
         from,
         to,
         0,
-        null,
-        transition.effectiveAt,
-        nextTransitionAt
+        null
       );
 
       return fallbackSegment ? [fallbackSegment] : [];
@@ -169,9 +168,7 @@ export class HistoryService {
           from,
           to,
           segmentSamples.length,
-          segmentSamples[segmentSamples.length - 1] ?? null,
-          transition.effectiveAt,
-          nextTransitionAt
+          segmentSamples[segmentSamples.length - 1] ?? null
         );
 
         if (stateSegment) {
@@ -186,9 +183,7 @@ export class HistoryService {
           from,
           to,
           0,
-          null,
-          transition.effectiveAt,
-          nextTransitionAt
+          null
         );
 
         if (noDataSegment) {
@@ -206,18 +201,16 @@ export class HistoryService {
     const hasTrailingNoData =
       trailingGapStart <= nominalSegmentEnd &&
       nominalSegmentEnd - lastSample.observedAt > gapThresholdSeconds;
-    const stateSegmentEnd = hasTrailingNoData ? trailingGapStart : nominalSegmentEnd;
+    const finalStateEndedAt = hasTrailingNoData ? trailingGapStart : nextTransitionAt;
 
     const finalStateSegment = this.buildSingleTimelineSegment(
       transition.status,
       segmentCursor,
-      stateSegmentEnd,
+      finalStateEndedAt,
       from,
       to,
       segmentSamples.length,
-      segmentSamples[segmentSamples.length - 1] ?? null,
-      transition.effectiveAt,
-      nextTransitionAt
+      segmentSamples[segmentSamples.length - 1] ?? null
     );
 
     if (finalStateSegment) {
@@ -232,9 +225,7 @@ export class HistoryService {
         from,
         to,
         0,
-        null,
-        transition.effectiveAt,
-        nextTransitionAt
+        null
       );
 
       if (trailingNoData) {
@@ -252,9 +243,7 @@ export class HistoryService {
     from: number,
     to: number,
     sampleCount: number,
-    lastSample: PersistedMonitorSample | null,
-    transitionStartedAt: number,
-    nextTransitionAt: number | null
+    lastSample: PersistedMonitorSample | null
   ): TimelineSegment | null {
     const visibleStart = Math.max(startedAt, from);
     const visibleEnd = Math.min(endedAt ?? to, to);
@@ -278,8 +267,8 @@ export class HistoryService {
       lastObservedAt: lastSample?.observedAt ?? null,
       latestFailureReason: lastSample?.failureReason ?? null,
       latestLatencyMs: lastSample?.externalLatencyMs ?? null,
-      startedBeforeRange: startedAt < from || transitionStartedAt < from,
-      endsAfterRange: endedAt === null || endedAt > to || nextTransitionAt === null
+      startedBeforeRange: startedAt < from,
+      endsAfterRange: endedAt === null || endedAt > to
     };
   }
 }

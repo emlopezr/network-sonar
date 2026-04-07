@@ -22,7 +22,7 @@ class FakeEventSource {
   public close(): void {}
 }
 
-describe("providers page", () => {
+describe("configuration page", () => {
   beforeEach(() => {
     window.history.replaceState({}, "", "/");
     FakeEventSource.instances = [];
@@ -55,6 +55,9 @@ describe("providers page", () => {
               ],
               retentionDays: 30,
               sampleIntervalSeconds: 5,
+              monitorRuntime: {
+                mode: "running"
+              },
               monitorSettings: {
                 roundRobinEnabled: false,
                 confirmDownAfter: 2,
@@ -108,15 +111,15 @@ describe("providers page", () => {
     vi.unstubAllGlobals();
   });
 
-  it("navigates to providers and renders the management UI", async () => {
+  it("navigates to configuration and renders the management UI", async () => {
     render(<App />);
 
     await waitFor(() => {
       expect(screen.getByText("Dashboard")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Providers" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Configuration" })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole("link", { name: "Providers" }));
+    fireEvent.click(screen.getByRole("link", { name: "Configuration" }));
 
     await waitFor(() => {
       expect(screen.getByText("Add a custom provider")).toBeInTheDocument();
@@ -140,6 +143,6 @@ describe("providers page", () => {
     expect(screen.getByDisplayValue("Internal Edge DNS")).toBeInTheDocument();
     expect(screen.getByDisplayValue("10.10.10.10")).toBeInTheDocument();
 
-    expect(window.location.pathname).toBe("/providers");
+    expect(window.location.pathname).toBe("/config");
   });
 });

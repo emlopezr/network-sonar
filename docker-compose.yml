@@ -1,0 +1,49 @@
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+    container_name: network-sonar
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4044
+      MONITOR_DB_PATH: /data/network-sonar.sqlite
+      MONITOR_TARGET: ${MONITOR_TARGET:-}
+      MONITOR_TARGETS: ${MONITOR_TARGETS:-}
+      MONITOR_INTERVAL_SECONDS: ${MONITOR_INTERVAL_SECONDS:-5}
+      MONITOR_RETENTION_DAYS: ${MONITOR_RETENTION_DAYS:-30}
+      MONITOR_STALE_AFTER_SECONDS: ${MONITOR_STALE_AFTER_SECONDS:-15}
+      MONITOR_PING_TIMEOUT_MS: ${MONITOR_PING_TIMEOUT_MS:-3000}
+      MONITOR_PING_BINARY: ping
+      MONITOR_ROUND_ROBIN_ENABLED: ${MONITOR_ROUND_ROBIN_ENABLED:-false}
+      MONITOR_CONFIRM_DOWN_AFTER: ${MONITOR_CONFIRM_DOWN_AFTER:-2}
+      MONITOR_CONFIRM_UP_AFTER: ${MONITOR_CONFIRM_UP_AFTER:-2}
+    ports:
+      - "${DOCKER_PUBLISH_HOST:-127.0.0.1}:${APP_PORT:-4044}:4044"
+    volumes:
+      - network-sonar-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4044/health').then((response)=>{if(!response.ok) process.exit(1);}).catch(()=>process.exit(1))"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  network-sonar-data:

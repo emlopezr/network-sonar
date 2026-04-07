@@ -53,6 +53,10 @@ function normalizeMonitorSettings(settings: MonitorSettings | undefined): Monito
   };
 }
 
+function normalizeTimelineSegments(segments: TimelineSegment[] | undefined): TimelineSegment[] {
+  return segments ?? [];
+}
+
 function mergeHistorySample(
   history: MonitorSample[],
   incoming: MonitorSample,
@@ -91,11 +95,12 @@ function mergeLiveSegment(
   const nextSegments = trimTimelineSegments(segments, minObservedAt);
   const latestSegment = nextSegments[nextSegments.length - 1] ?? null;
   const segmentStart = snapshot.lastChangeAt;
+  const closesNoDataGap = latestSegment?.status === "no_data";
+  const nextSegmentStart = closesNoDataGap ? snapshot.observedAt : segmentStart;
 
   if (
     latestSegment &&
-    latestSegment.status === snapshot.status &&
-    latestSegment.startedAt === segmentStart
+    latestSegment.status === snapshot.status
   ) {
     const updatedSegment: TimelineSegment = {
       ...latestSegment,
@@ -117,9 +122,9 @@ function mergeLiveSegment(
         ...nextSegments.slice(0, -1),
         {
           ...latestSegment,
-          endedAt: segmentStart,
-          visibleEnd: Math.max(latestSegment.visibleStart, segmentStart),
-          durationSeconds: Math.max(0, Math.max(latestSegment.visibleStart, segmentStart) - latestSegment.visibleStart),
+          endedAt: nextSegmentStart,
+          visibleEnd: Math.max(latestSegment.visibleStart, nextSegmentStart),
+          durationSeconds: Math.max(0, Math.max(latestSegment.visibleStart, nextSegmentStart) - latestSegment.visibleStart),
           endsAfterRange: false
         }
       ].filter((segment) => segment.visibleEnd > segment.visibleStart)
@@ -129,16 +134,16 @@ function mergeLiveSegment(
     ...closedSegments,
     {
       status: snapshot.status,
-      startedAt: segmentStart,
+      startedAt: nextSegmentStart,
       endedAt: null,
-      visibleStart: Math.max(segmentStart, minObservedAt),
+      visibleStart: Math.max(nextSegmentStart, minObservedAt),
       visibleEnd: snapshot.observedAt,
-      durationSeconds: Math.max(0, snapshot.observedAt - Math.max(segmentStart, minObservedAt)),
+      durationSeconds: Math.max(0, snapshot.observedAt - Math.max(nextSegmentStart, minObservedAt)),
       sampleCount: 0,
       lastObservedAt: snapshot.observedAt,
       latestFailureReason: snapshot.failureReason,
       latestLatencyMs: snapshot.externalLatencyMs,
-      startedBeforeRange: segmentStart < minObservedAt,
+      startedBeforeRange: nextSegmentStart < minObservedAt,
       endsAfterRange: true
     }
   ];
@@ -227,14 +232,16 @@ export function Dashboard({
         }
 
         startTransition(() => {
+          const normalizedSegments = normalizeTimelineSegments(payload.historySegments);
+
           setCurrent(payload.current);
           setHistory(payload.history);
-          setHistorySegments(payload.historySegments);
-          setSelectedSegment(payload.historySegments[payload.historySegments.length - 1] ?? null);
+          setHistorySegments(normalizedSegments);
+          setSelectedSegment(normalizedSegments[normalizedSegments.length - 1] ?? null);
           setRetentionDays(payload.retentionDays);
           setSampleIntervalSeconds(payload.sampleIntervalSeconds);
           setMonitorSettings(normalizeMonitorSettings(payload.monitorSettings));
-          setMonitorRuntime(payload.monitorRuntime);
+          setMonitorRuntime(payload.monitorRuntime ?? defaultMonitorRuntime);
         });
       } catch (loadError) {
         if (!cancelled) {

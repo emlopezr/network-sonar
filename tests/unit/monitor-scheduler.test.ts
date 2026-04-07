@@ -40,6 +40,7 @@ describe("MonitorScheduler", () => {
       harness.monitorService,
       harness.purgeService,
       harness.monitorSettingsService,
+      harness.monitorRuntimeService,
       workerRunner
     );
     harness.monitorSettingsService.updateSettings({ roundRobinEnabled: true });
@@ -84,5 +85,34 @@ describe("MonitorScheduler", () => {
         externalTargets: ["8.8.8.8", "1.1.1.1"]
       })
     );
+  });
+
+  it("skips new cycles while the runtime is paused", async () => {
+    const workerRunner = vi.fn().mockResolvedValue(createCycle());
+    const scheduler = harness.createScheduler(workerRunner);
+
+    harness.monitorRuntimeService.updateRuntime("paused");
+    await (scheduler as unknown as { executeCycle: () => Promise<void> }).executeCycle();
+
+    expect(workerRunner).not.toHaveBeenCalled();
+  });
+
+  it("lets an in-flight cycle finish even if the runtime pauses mid-flight", async () => {
+    let resolveCycle!: (value: ReturnType<typeof createCycle>) => void;
+    const workerRunner = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveCycle = resolve;
+        })
+    );
+    const scheduler = harness.createScheduler(workerRunner);
+
+    const pendingCycle = (scheduler as unknown as { executeCycle: () => Promise<void> }).executeCycle();
+    harness.monitorRuntimeService.updateRuntime("paused");
+    resolveCycle(createCycle());
+    await pendingCycle;
+
+    expect(workerRunner).toHaveBeenCalledTimes(1);
+    expect(harness.repository.getAll()).toHaveLength(1);
   });
 });

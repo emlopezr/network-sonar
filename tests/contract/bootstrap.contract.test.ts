@@ -26,6 +26,9 @@ describe("GET /api/v1/bootstrap", () => {
         confirmDownAfter: 2,
         confirmUpAfter: 2
       },
+      monitorRuntime: {
+        mode: "running"
+      },
       current: {
         status: "ok",
         externalTarget: "1.1.1.1",

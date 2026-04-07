@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 export interface AppConfig {
+  host: string;
   port: number;
   frontendDistPath: string;
   monitor: {
@@ -54,6 +55,11 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   return fallback;
 }
 
+function parseHost(value: string | undefined, fallback: string): string {
+  const normalizedValue = value?.trim();
+  return normalizedValue ? normalizedValue : fallback;
+}
+
 function parseTargets(rawTargets: string | undefined, fallbackTargets: string[]): string[] {
   if (!rawTargets) {
     return fallbackTargets;
@@ -81,7 +87,8 @@ export function loadConfig(): AppConfig {
   );
 
   return {
-    port: parsePositiveInteger(process.env.PORT, 4173),
+    host: parseHost(process.env.HOST, "127.0.0.1"),
+    port: parsePositiveInteger(process.env.PORT, 4044),
     frontendDistPath: path.resolve(__dirname, "../../frontend/dist"),
     monitor: {
       targets: configuredTargets,

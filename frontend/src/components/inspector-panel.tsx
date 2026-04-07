@@ -58,6 +58,9 @@ export function InspectorPanel({
 
   return (
     <section className="inspector-panel inspector-panel--segment" aria-live="polite">
+      <p className="eyebrow">
+        Segment {segment.status === "ok" ? "OK" : segment.status === "down" ? "DOWN" : "NO DATA"}
+      </p>
       <dl className="inspector-panel__grid">
         <div>
           <dt>Started</dt>

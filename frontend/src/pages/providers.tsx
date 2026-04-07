@@ -148,6 +148,7 @@ export function ProvidersPage({
         setPendingProviderId(null);
         setSavingProviderForm(false);
       },
+      onRuntime: () => undefined,
       onSample: (payload) => {
         setHistory((previous) =>
           mergeHistorySample(previous, payload, payload.observedAt - rangeWindow)
@@ -377,7 +378,7 @@ export function ProvidersPage({
 
   return (
     <AppShell
-      activePage="providers"
+      activePage="config"
       onNavigate={onNavigate}
       topbarContent={
         <div className="dashboard-topbar__context">
@@ -463,7 +464,7 @@ export function ProvidersPage({
               <p className="eyebrow">Custom target</p>
               <h2>Add a custom provider</h2>
               <p>
-                Add any reliable IP or hostname and optionally attach a logo URL. Default providers stay protected and cannot be deleted.
+                Add any reliable IP or hostname and optionally attach a logo URL. Remote logos must use HTTPS; local-only HTTP is allowed on localhost. Default providers stay protected and cannot be deleted.
               </p>
             </div>
             <div className="providers-form__actions">
@@ -684,7 +685,7 @@ export function ProvidersPage({
                   <span>Logo URL</span>
                   <input
                     value={customLogoUrl}
-                    placeholder="Example: https://assets.example.com/dns-logo.png"
+                    placeholder="Example: https://assets.example.com/dns-logo.png or http://localhost:8080/dns-logo.png"
                     onChange={(event) => setCustomLogoUrl(event.target.value)}
                   />
                 </label>

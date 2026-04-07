@@ -54,6 +54,7 @@ function ProviderBrandLogo({
       alt=""
       loading="lazy"
       decoding="async"
+      referrerPolicy="no-referrer"
       onError={() => setHasImageError(true)}
     />
   );

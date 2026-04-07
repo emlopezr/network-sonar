@@ -19,7 +19,6 @@ CREATE INDEX IF NOT EXISTS idx_connection_logs_status_time
 CREATE TABLE IF NOT EXISTS monitor_settings (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   round_robin_enabled INTEGER NOT NULL CHECK (round_robin_enabled IN (0, 1)),
-  is_paused INTEGER NOT NULL DEFAULT 0 CHECK (is_paused IN (0, 1)),
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 );

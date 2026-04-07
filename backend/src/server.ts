@@ -69,8 +69,8 @@ export function main(): void {
     monitorRuntimeService
   });
 
-  const server = app.listen(config.port, () => {
-    console.log(`Network Sonar listening on http://127.0.0.1:${config.port}`);
+  const server = app.listen(config.port, config.host, () => {
+    console.log(`Network Sonar listening on http://${config.host}:${config.port}`);
   });
 
   scheduler.start();

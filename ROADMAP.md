@@ -182,7 +182,7 @@ Como usuario, quiero ver bloques continuos de estado en vez de miles de puntos r
 - la timeline sigue siendo entendible
 - el usuario puede distinguir claramente periodos largos de `ok`, `down` y luego `NO DATA`
 
-## 3. Huecos `NO DATA` y continuidad honesta del historial
+## 3. [DONE] Huecos `NO DATA` y continuidad honesta del historial
 
 ### Historia / problema
 
@@ -234,7 +234,7 @@ Como usuario, quiero ver cuándo no hubo medición, para no confundir ausencia d
 - un hueco largo no aparece como continuidad falsa
 - la timeline muestra un tramo gris explícito de `NO DATA`
 
-## 4. Control `on/off` o `running/paused` del monitor
+## 4.[DONE] Control `on/off` o `running/paused` del monitor
 
 ### Historia / problema
 
@@ -336,7 +336,60 @@ Como usuario, quiero instalar la app rápido y dejarla siempre corriendo, sin te
 - la DB persiste reinicios
 - la app puede quedarse corriendo sin intervención manual constante
 
-## 6. Pulido de UI y consolidación visual
+
+
+
+
+## 6. Seguridad y hardening local-first
+
+### Historia / problema
+
+Como usuario, quiero que la app no abra vulnerabilidades innecesarias en el equipo donde corre.
+
+### Qué cubre esta historia
+
+- superficie de red
+- validación de inputs
+- contenedor con mínimos privilegios
+- disciplina de configuración
+
+### Decisiones de diseño ya tomadas
+
+- local-first
+- bind local por defecto
+- sin acceso remoto abierto
+- sin auth compleja para 1.0
+- mínima superficie web
+
+### Qué falta implementar
+
+- bind explícito a `127.0.0.1` por defecto
+- validación estricta de inputs
+- revisión de providers custom
+- revisar `logoUrl` custom por impacto de seguridad y privacidad
+- Docker con privilegios mínimos
+- variables y configuración documentadas
+
+### Dependencias
+
+- algunas decisiones dependen del packaging Docker
+
+### Dudas por aclarar
+
+- si `logoUrl` custom se mantiene o se reduce
+- si la exposición por red local será posible sólo por config avanzada
+
+### Trabajo diferido
+
+- auth o exposición remota, si alguna vez se quisiera, no va en 1.0
+
+### Criterio de cierre
+
+- la app no queda expuesta accidentalmente
+- no se aceptan inputs inseguros
+- Docker no usa privilegios de más
+
+## 7.1 Pulido de UI y consolidación visual
 
 ### Historia / problema
 
@@ -388,7 +441,7 @@ Como usuario, quiero una interfaz clara, consistente y rápida, que se sienta co
 - la UI se ve consistente entre dashboard, incidents y providers
 - la app sigue sintiéndose ligera y rápida
 
-## 7. Refactors de base y consolidación técnica
+## 7.2 Refactors de base y consolidación técnica
 
 ### Historia / problema
 
@@ -431,55 +484,6 @@ Como mantenedor, quiero una base de código más limpia y menos duplicada, para 
 
 - cambios futuros cuestan menos
 - la base está alineada con el producto real
-
-## 8. Seguridad y hardening local-first
-
-### Historia / problema
-
-Como usuario, quiero que la app no abra vulnerabilidades innecesarias en el equipo donde corre.
-
-### Qué cubre esta historia
-
-- superficie de red
-- validación de inputs
-- contenedor con mínimos privilegios
-- disciplina de configuración
-
-### Decisiones de diseño ya tomadas
-
-- local-first
-- bind local por defecto
-- sin acceso remoto abierto
-- sin auth compleja para 1.0
-- mínima superficie web
-
-### Qué falta implementar
-
-- bind explícito a `127.0.0.1` por defecto
-- validación estricta de inputs
-- revisión de providers custom
-- revisar `logoUrl` custom por impacto de seguridad y privacidad
-- Docker con privilegios mínimos
-- variables y configuración documentadas
-
-### Dependencias
-
-- algunas decisiones dependen del packaging Docker
-
-### Dudas por aclarar
-
-- si `logoUrl` custom se mantiene o se reduce
-- si la exposición por red local será posible sólo por config avanzada
-
-### Trabajo diferido
-
-- auth o exposición remota, si alguna vez se quisiera, no va en 1.0
-
-### Criterio de cierre
-
-- la app no queda expuesta accidentalmente
-- no se aceptan inputs inseguros
-- Docker no usa privilegios de más
 
 ## Orden sugerido de ejecución
 

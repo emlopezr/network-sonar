@@ -83,9 +83,9 @@ export function ProviderStrategyPanel({
               <button
                 type="button"
                 className="provider-panel__link"
-                onClick={() => onNavigate("/providers")}
+                onClick={() => onNavigate("/config")}
               >
-                Open configuration
+                Manage providers
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 declare namespace NodeJS {
   interface ProcessEnv {
+    HOST?: string;
     PORT?: string;
     MONITOR_TARGET?: string;
     MONITOR_TARGETS?: string;
@@ -10,5 +11,7 @@ declare namespace NodeJS {
     MONITOR_PING_TIMEOUT_MS?: string;
     MONITOR_PING_BINARY?: string;
     MONITOR_ROUND_ROBIN_ENABLED?: string;
+    MONITOR_CONFIRM_DOWN_AFTER?: string;
+    MONITOR_CONFIRM_UP_AFTER?: string;
   }
 }

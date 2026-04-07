@@ -12,6 +12,7 @@ import { MonitorScheduler } from "../../backend/src/network/monitor-scheduler";
 import { CurrentStatusService } from "../../backend/src/services/current-status-service";
 import { MonitorEventBus } from "../../backend/src/services/event-bus";
 import { HistoryService } from "../../backend/src/services/history-service";
+import { MonitorRuntimeService } from "../../backend/src/services/monitor-runtime-service";
 import { MonitorService } from "../../backend/src/services/monitor-service";
 import { MonitorSettingsService } from "../../backend/src/services/monitor-settings-service";
 import type { WorkerCycleRequest, WorkerCycleResult } from "../../backend/src/types/monitor";
@@ -26,6 +27,7 @@ export interface TestHarness {
   currentStatusService: CurrentStatusService;
   historyService: HistoryService;
   eventBus: MonitorEventBus;
+  monitorRuntimeService: MonitorRuntimeService;
   monitorSettingsService: MonitorSettingsService;
   monitorService: MonitorService;
   createScheduler: (runner: (request: WorkerCycleRequest) => Promise<WorkerCycleResult>) => MonitorScheduler;
@@ -49,7 +51,8 @@ export function createCycle(overrides: Partial<WorkerCycleResult> = {}): WorkerC
 
 export function createTestHarness(): TestHarness {
   const config: AppConfig = {
-    port: 4173,
+    host: "127.0.0.1",
+    port: 4044,
     frontendDistPath: "/tmp/network-sonar-test-dist",
     monitor: {
       targets: ["1.1.1.1", "8.8.8.8"],
@@ -82,6 +85,10 @@ export function createTestHarness(): TestHarness {
     config.monitor.intervalSeconds
   );
   const eventBus = new MonitorEventBus();
+  const monitorRuntimeService = new MonitorRuntimeService(
+    monitorSettingsRepository,
+    eventBus
+  );
   const monitorSettingsService = new MonitorSettingsService(
     monitorSettingsRepository,
     eventBus,
@@ -109,6 +116,7 @@ export function createTestHarness(): TestHarness {
       currentStatusService,
       historyService,
       eventBus,
+      monitorRuntimeService,
       monitorSettingsService
     }),
     config,
@@ -119,6 +127,7 @@ export function createTestHarness(): TestHarness {
     currentStatusService,
     historyService,
     eventBus,
+    monitorRuntimeService,
     monitorSettingsService,
     monitorService,
     createScheduler: (runner) =>
@@ -127,6 +136,7 @@ export function createTestHarness(): TestHarness {
         monitorService,
         purgeService,
         monitorSettingsService,
+        monitorRuntimeService,
         runner
       ),
     close: () => {

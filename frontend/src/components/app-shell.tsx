@@ -1,7 +1,7 @@
 import type { MouseEvent, ReactNode } from "react";
 
-export type AppPath = "/" | "/incidents" | "/providers";
-type AppPage = "dashboard" | "incidents" | "providers";
+export type AppPath = "/" | "/incidents" | "/config";
+type AppPage = "dashboard" | "incidents" | "config";
 
 const navigationItems: Array<{ id: AppPage; label: string; path: AppPath }> = [
   {
@@ -15,9 +15,9 @@ const navigationItems: Array<{ id: AppPage; label: string; path: AppPath }> = [
     path: "/incidents"
   },
   {
-    id: "providers",
+    id: "config",
     label: "Configuration",
-    path: "/providers"
+    path: "/config"
   }
 ];
 
@@ -42,7 +42,9 @@ export function AppShell({
       <aside className="dashboard-sidebar">
         <div className="dashboard-sidebar__brand">
           <div className="dashboard-sidebar__brand-row">
-            <span className="dashboard-sidebar__sensor" aria-hidden="true" />
+            <span className="dashboard-sidebar__sensor" aria-hidden="true">
+              <span className="dashboard-sidebar__sensor-icon" />
+            </span>
             <div>
               <div className="dashboard-sidebar__node mono">SONAR-01</div>
               <div className="dashboard-sidebar__state mono">Local Node Active</div>

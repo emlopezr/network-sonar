@@ -63,6 +63,124 @@ npm run build
 npm run start
 ```
 
+Default runtime URL:
+
+- App runtime: `http://127.0.0.1:4044`
+
+## Docker Runtime
+
+The official installation path is Docker Compose. It keeps the app running in the background, stores SQLite data in a named volume, and binds locally by default.
+
+### Install and keep it running
+
+1. Install Docker Desktop (Windows/macOS) or Docker Engine + Compose plugin (Linux).
+2. Clone this repository and enter it:
+
+```bash
+git clone <your-repo-url>
+cd network-sonar
+```
+
+3. Create your local config file:
+
+```bash
+cp .env.example .env
+```
+
+4. Start the app in the background:
+
+```bash
+docker compose up -d --build
+```
+
+5. Open the app:
+
+```text
+http://127.0.0.1:4044
+```
+
+6. Confirm it is running:
+
+```bash
+docker compose ps
+docker compose logs -f
+```
+
+### Automatic startup after reboot
+
+The Compose file uses `restart: unless-stopped`, so Network Sonar will start again automatically after a reboot as long as Docker itself starts with the system.
+
+- Docker Desktop: enable "Start Docker Desktop when you log in".
+- Linux with Docker Engine: make sure the Docker service is enabled on boot.
+- If you stop the container manually with `docker compose stop`, it stays stopped until you start it again.
+
+### Update the installation
+
+Pull the latest code and rebuild the container:
+
+```bash
+git pull
+docker compose up -d --build
+```
+
+Your SQLite data is kept in the Docker volume, so updates do not wipe the history.
+
+### Stop or remove it
+
+Stop the app but keep data:
+
+```bash
+docker compose stop
+```
+
+Stop and remove the container but keep data:
+
+```bash
+docker compose down
+```
+
+Stop and remove everything including saved SQLite data:
+
+```bash
+docker compose down -v
+```
+
+### Local-only by default
+
+The default installation publishes only to `127.0.0.1`, so it is not exposed to your LAN unless you explicitly change it.
+
+If you really want LAN access, set this in `.env` and restart:
+
+```bash
+DOCKER_PUBLISH_HOST=0.0.0.0
+docker compose up -d
+```
+
+This is not the default because 1.0 is local-first and does not add authentication.
+
+```bash
+cp .env.example .env
+docker compose up -d --build
+```
+
+Open:
+
+- `http://127.0.0.1:4044`
+
+Useful commands:
+
+```bash
+docker compose logs -f
+docker compose down
+docker compose up -d --build
+```
+
+Notes:
+
+- SQLite persists in the `network-sonar-data` Docker volume.
+- The container only publishes to `127.0.0.1` by default.
+- To expose it to your LAN intentionally, set `DOCKER_PUBLISH_HOST=0.0.0.0` in `.env`.
+
 ## Available Commands
 
 - `npm run dev`: start backend and frontend workspaces in parallel
@@ -80,7 +198,8 @@ npm run start
 Create a root `.env` file to override defaults:
 
 ```bash
-PORT=4173
+HOST=127.0.0.1
+PORT=4044
 MONITOR_TARGET=1.1.1.1
 MONITOR_INTERVAL_SECONDS=5
 MONITOR_RETENTION_DAYS=30
@@ -95,6 +214,7 @@ Notes:
 - `MONITOR_DB_PATH` is resolved from the repository root.
 - `MONITOR_STALE_AFTER_SECONDS` defaults to three times the monitor interval.
 - In production, the backend serves the built frontend from `frontend/dist`.
+- Custom provider logo URLs must use `https://`, except for local-only `http://localhost` or `http://127.0.0.1`.
 
 ## API Overview
 

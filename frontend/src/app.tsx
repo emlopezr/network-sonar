@@ -10,8 +10,8 @@ function normalizePathname(pathname: string): AppPath {
     return "/incidents";
   }
 
-  if (pathname === "/providers") {
-    return "/providers";
+  if (pathname === "/config") {
+    return "/config";
   }
 
   return "/";
@@ -44,7 +44,7 @@ export function App() {
     return <IncidentsPage onNavigate={navigate} />;
   }
 
-  if (pathname === "/providers") {
+  if (pathname === "/config") {
     return <ProvidersPage onNavigate={navigate} />;
   }
 

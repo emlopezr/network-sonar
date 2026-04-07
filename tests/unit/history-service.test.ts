@@ -253,4 +253,67 @@ describe("history service timeline segments", () => {
       endsAfterRange: true
     });
   });
+
+  it("inserts a no_data segment when samples are separated by a long gap", () => {
+    const service = new HistoryService(
+      createRepository([
+        createStoredSample(100, "ok"),
+        createStoredSample(115, "ok")
+      ]),
+      createTransitionStore([
+        createTransition("ok", 100)
+      ]),
+      5
+    );
+
+    const segments = service.getTimelineSegments(100, 120);
+
+    expect(segments).toHaveLength(3);
+    expect(segments[0]).toMatchObject({
+      status: "ok",
+      visibleStart: 100,
+      visibleEnd: 105,
+      sampleCount: 1
+    });
+    expect(segments[1]).toMatchObject({
+      status: "no_data",
+      visibleStart: 105,
+      visibleEnd: 115,
+      sampleCount: 0,
+      lastObservedAt: null
+    });
+    expect(segments[2]).toMatchObject({
+      status: "ok",
+      visibleStart: 115,
+      visibleEnd: 120,
+      sampleCount: 1
+    });
+  });
+
+  it("adds trailing no_data when the last sample is too old for the rest of the range", () => {
+    const service = new HistoryService(
+      createRepository([
+        createStoredSample(100, "ok")
+      ]),
+      createTransitionStore([
+        createTransition("ok", 100)
+      ]),
+      5
+    );
+
+    const segments = service.getTimelineSegments(100, 120);
+
+    expect(segments).toHaveLength(2);
+    expect(segments[0]).toMatchObject({
+      status: "ok",
+      visibleStart: 100,
+      visibleEnd: 105
+    });
+    expect(segments[1]).toMatchObject({
+      status: "no_data",
+      visibleStart: 105,
+      visibleEnd: 120,
+      endedAt: null
+    });
+  });
 });

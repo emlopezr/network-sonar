@@ -92,4 +92,25 @@ describe("GET /api/v1/history", () => {
       latestFailureReason: "timeout"
     });
   });
+
+  it("returns no_data segments for long gaps between samples", async () => {
+    const base = Math.floor(Date.now() / 1000) - 600;
+
+    harness.monitorService.processCycle(createCycle({ observedAt: base }));
+    harness.monitorService.processCycle(createCycle({ observedAt: base + 15 }));
+
+    const response = await request(harness.app).get(
+      `/api/v1/history/segments?from=${base}&to=${base + 20}`
+    );
+    const body = response.body as unknown as TimelineSegmentsResponse;
+
+    expect(response.status).toBe(200);
+    expect(body.segments).toHaveLength(3);
+    expect(body.segments[1]).toMatchObject({
+      status: "no_data",
+      visibleStart: base + 5,
+      visibleEnd: base + 15,
+      sampleCount: 0
+    });
+  });
 });

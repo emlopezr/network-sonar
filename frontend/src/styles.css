@@ -98,32 +98,22 @@ dd {
 }
 
 .dashboard-sidebar__sensor {
-  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
   border-radius: 4px;
   background: var(--surface-high);
 }
 
-.dashboard-sidebar__sensor::before,
-.dashboard-sidebar__sensor::after {
-  content: "";
-  position: absolute;
-}
-
-.dashboard-sidebar__sensor::before {
-  inset: 9px;
-  border: 1px solid var(--signal-ok);
-  border-radius: 999px;
-}
-
-.dashboard-sidebar__sensor::after {
-  top: 16px;
-  left: 16px;
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
+.dashboard-sidebar__sensor-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
   background: var(--signal-ok);
+  -webkit-mask: url("/icons/radar.svg") center / contain no-repeat;
+  mask: url("/icons/radar.svg") center / contain no-repeat;
 }
 
 .dashboard-sidebar__node {
@@ -431,6 +421,13 @@ dd {
   font-size: 0.84rem;
 }
 
+.status-hero__mode {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .status-hero__copy {
   max-width: 34ch;
   color: var(--ink-muted);
@@ -577,6 +574,31 @@ dd {
 
 .control-bar__refresh:hover {
   color: var(--ink-strong);
+}
+
+.control-bar__runtime {
+  padding: 10px 14px;
+  border-radius: 4px;
+  background: rgba(100, 116, 139, 0.14);
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-size: 0.74rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.control-bar__runtime:hover {
+  color: var(--ink-strong);
+}
+
+.control-bar__runtime.is-paused {
+  color: #dce4f2;
+  background: rgba(100, 116, 139, 0.28);
+}
+
+.control-bar__runtime:disabled {
+  opacity: 0.65;
+  cursor: progress;
 }
 
 .live-switch {

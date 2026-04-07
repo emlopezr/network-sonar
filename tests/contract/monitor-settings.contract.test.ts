@@ -186,5 +186,40 @@ describe("monitor settings routes", () => {
     expect(invalidLogoResponse.body).toMatchObject({
       error: "Logo URL must be a valid absolute URL."
     });
+
+    const insecureLogoResponse = await request(harness.app)
+      .post("/api/v1/monitor/providers")
+      .send({
+        label: "Internal Edge DNS",
+        target: "10.10.10.10",
+        logoUrl: "http://assets.example.com/internal-dns.png"
+      });
+
+    expect(insecureLogoResponse.status).toBe(400);
+    expect(insecureLogoResponse.body).toMatchObject({
+      error: "Logo URL must use https or local http on localhost/127.0.0.1."
+    });
+
+    const localhostLogoResponse = await request(harness.app)
+      .post("/api/v1/monitor/providers")
+      .send({
+        label: "Local Edge DNS",
+        target: "resolver.example.com",
+        logoUrl: "http://localhost:8080/internal-dns.png"
+      });
+
+    expect(localhostLogoResponse.status).toBe(201);
+
+    const invalidTargetResponse = await request(harness.app)
+      .post("/api/v1/monitor/providers")
+      .send({
+        label: "Bad Target",
+        target: "https://resolver.example.com/path"
+      });
+
+    expect(invalidTargetResponse.status).toBe(400);
+    expect(invalidTargetResponse.body).toMatchObject({
+      error: "Target must be a hostname or IP address only."
+    });
   });
 });

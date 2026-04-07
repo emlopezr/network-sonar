@@ -29,7 +29,29 @@ export function createApp(dependencies: AppDependencies) {
   const app = express();
 
   app.disable("x-powered-by");
-  app.use(express.json());
+  app.use((_request, response, next) => {
+    response.setHeader("X-Content-Type-Options", "nosniff");
+    response.setHeader("X-Frame-Options", "DENY");
+    response.setHeader("Referrer-Policy", "no-referrer");
+    response.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+    response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+    response.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https: http://127.0.0.1 http://localhost",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "frame-ancestors 'none'"
+      ].join("; ")
+    );
+    next();
+  });
+  app.use(express.json({ limit: "16kb" }));
   app.use(createHealthRouter());
   app.use(
     createBootstrapRouter(

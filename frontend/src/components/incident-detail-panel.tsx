@@ -82,7 +82,7 @@ export function IncidentDetailPanel({ incident }: { incident: OutageIncident | n
           <dd className="mono">{formatDuration(incident.durationSeconds)}</dd>
         </div>
         <div>
-          <dt>Samples</dt>
+          <dt>Incident samples</dt>
           <dd className="mono">{incident.sampleCount}</dd>
         </div>
         <div>

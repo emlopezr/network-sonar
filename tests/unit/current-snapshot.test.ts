@@ -30,6 +30,12 @@ describe("shouldMarkSnapshotStale", () => {
     ).toBe(false);
   });
 
+  it("ignores heartbeat activity when requested", () => {
+    expect(
+      shouldMarkSnapshotStale(createSnapshot(), 1_710_000_014, 1_710_000_016, false)
+    ).toBe(true);
+  });
+
   it("never re-marks an already stale snapshot", () => {
     expect(
       shouldMarkSnapshotStale(createSnapshot({ status: "stale" }), 1_710_000_000, 1_710_000_100)

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { buildProbeOrder, runProbeSequence } from "../../backend/src/network/target-probe";
+import type { MonitorProbeResult } from "../../backend/src/types/monitor";
 
 describe("buildProbeOrder", () => {
   it("keeps the first provider first when round robin is not advanced", () => {
@@ -50,9 +51,9 @@ describe("runProbeSequence", () => {
   });
 
   it("probes all configured providers in parallel and keeps the configured priority order", async () => {
-    const probeRunner = vi.fn((_: string, target: string) => {
+    const probeRunner = vi.fn((_: string, target: string): Promise<MonitorProbeResult> => {
       if (target === "1.1.1.1") {
-        return new Promise((resolve) => {
+        return new Promise<MonitorProbeResult>((resolve) => {
           setTimeout(() => {
             resolve({
               target,
@@ -65,7 +66,7 @@ describe("runProbeSequence", () => {
       }
 
       if (target === "8.8.8.8") {
-        return new Promise((resolve) => {
+        return new Promise<MonitorProbeResult>((resolve) => {
           setTimeout(() => {
             resolve({
               target,

@@ -1,5 +1,4 @@
 import type { Server } from "node:http";
-
 import type { Express } from "express";
 
 export interface OpenStreamResult {

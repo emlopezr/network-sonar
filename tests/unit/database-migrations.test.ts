@@ -61,13 +61,15 @@ describe("database migrations", () => {
 
     expect(columns).toContain("confirm_down_after");
     expect(columns).toContain("confirm_up_after");
+    expect(columns).toContain("is_paused");
     expect(tables).toEqual([
       "monitor_sensitivity_revisions",
       "monitor_state_transitions"
     ]);
     expect(migrationNames).toEqual([
       "001_init.sql",
-      "002_confirmed_state.sql"
+      "002_confirmed_state.sql",
+      "003_monitor_runtime.sql"
     ]);
 
     migratedDatabase.close();

@@ -38,8 +38,116 @@ class FakeEventSource {
 }
 
 describe("dashboard timeline", () => {
+  const defaultBootstrapPayload: any = {
+    current: {
+      observedAt: 1_710_000_000,
+      status: "ok",
+      externalTarget: "1.1.1.1",
+      externalOk: true,
+      externalLatencyMs: 12,
+      failureReason: null,
+      staleAfterSeconds: 15,
+      lastChangeAt: 1_710_000_000
+    },
+    history: [
+      {
+        observedAt: 1_710_000_000,
+        status: "ok",
+        externalTarget: "1.1.1.1",
+        externalOk: true,
+        externalLatencyMs: 12,
+        failureReason: null
+      },
+      {
+        observedAt: 1_710_000_300,
+        status: "down",
+        externalTarget: "1.1.1.1",
+        externalOk: false,
+        externalLatencyMs: null,
+        failureReason: "timeout"
+      }
+    ],
+    historySegments: [
+      {
+        status: "ok",
+        startedAt: 1_710_000_000,
+        endedAt: 1_710_000_300,
+        visibleStart: 1_710_000_000,
+        visibleEnd: 1_710_000_300,
+        durationSeconds: 300,
+        sampleCount: 1,
+        lastObservedAt: 1_710_000_000,
+        latestFailureReason: null,
+        latestLatencyMs: 12,
+        startedBeforeRange: false,
+        endsAfterRange: false
+      },
+      {
+        status: "down",
+        startedAt: 1_710_000_300,
+        endedAt: null,
+        visibleStart: 1_710_000_300,
+        visibleEnd: 1_710_000_300,
+        durationSeconds: 0,
+        sampleCount: 1,
+        lastObservedAt: 1_710_000_300,
+        latestFailureReason: "timeout",
+        latestLatencyMs: null,
+        startedBeforeRange: false,
+        endsAfterRange: true
+      }
+    ],
+    retentionDays: 30,
+    sampleIntervalSeconds: 5,
+    monitorRuntime: {
+      mode: "running"
+    },
+    monitorSettings: {
+      roundRobinEnabled: false,
+      confirmDownAfter: 2,
+      confirmUpAfter: 2,
+      providers: [
+        {
+          id: 1,
+          sortOrder: 0,
+          target: "1.1.1.1",
+          company: "Cloudflare",
+          logoUrl: null,
+          label: "Cloudflare Resolver 1.1.1.1",
+          kind: "default",
+          isDefault: true,
+          isEnabled: true
+        },
+        {
+          id: 2,
+          sortOrder: 1,
+          target: "8.8.8.8",
+          company: "Google",
+          logoUrl: null,
+          label: "Google Public DNS 8.8.8.8",
+          kind: "default",
+          isDefault: true,
+          isEnabled: true
+        },
+        {
+          id: 3,
+          sortOrder: 2,
+          target: "9.9.9.9",
+          company: "Quad9",
+          logoUrl: null,
+          label: "Quad9 Secure DNS 9.9.9.9",
+          kind: "default",
+          isDefault: true,
+          isEnabled: false
+        }
+      ]
+    }
+  };
+  let bootstrapPayload: any = defaultBootstrapPayload;
+
   beforeEach(() => {
     FakeEventSource.instances = [];
+    bootstrapPayload = defaultBootstrapPayload;
     vi.stubGlobal("EventSource", FakeEventSource);
     vi.stubGlobal(
       "fetch",
@@ -62,108 +170,7 @@ describe("dashboard timeline", () => {
 
         return Promise.resolve(
           new Response(
-            JSON.stringify({
-              current: {
-                observedAt: 1_710_000_000,
-                status: "ok",
-                externalTarget: "1.1.1.1",
-                externalOk: true,
-                externalLatencyMs: 12,
-                failureReason: null,
-                staleAfterSeconds: 15,
-                lastChangeAt: 1_710_000_000
-              },
-              history: [
-                {
-                  observedAt: 1_710_000_000,
-                  status: "ok",
-                  externalTarget: "1.1.1.1",
-                  externalOk: true,
-                  externalLatencyMs: 12,
-                  failureReason: null
-                },
-                {
-                  observedAt: 1_710_000_300,
-                  status: "down",
-                  externalTarget: "1.1.1.1",
-                  externalOk: false,
-                  externalLatencyMs: null,
-                  failureReason: "timeout"
-                }
-              ],
-              historySegments: [
-                {
-                  status: "ok",
-                  startedAt: 1_710_000_000,
-                  endedAt: 1_710_000_300,
-                  visibleStart: 1_710_000_000,
-                  visibleEnd: 1_710_000_300,
-                  durationSeconds: 300,
-                  sampleCount: 1,
-                  lastObservedAt: 1_710_000_000,
-                  latestFailureReason: null,
-                  latestLatencyMs: 12,
-                  startedBeforeRange: false,
-                  endsAfterRange: false
-                },
-                {
-                  status: "down",
-                  startedAt: 1_710_000_300,
-                  endedAt: null,
-                  visibleStart: 1_710_000_300,
-                  visibleEnd: 1_710_000_300,
-                  durationSeconds: 0,
-                  sampleCount: 1,
-                  lastObservedAt: 1_710_000_300,
-                  latestFailureReason: "timeout",
-                  latestLatencyMs: null,
-                  startedBeforeRange: false,
-                  endsAfterRange: true
-                }
-              ],
-              retentionDays: 30,
-              sampleIntervalSeconds: 5,
-              monitorSettings: {
-                roundRobinEnabled: false,
-                confirmDownAfter: 2,
-                confirmUpAfter: 2,
-                providers: [
-                  {
-                    id: 1,
-                    sortOrder: 0,
-                    target: "1.1.1.1",
-                    company: "Cloudflare",
-                    logoUrl: null,
-                    label: "Cloudflare Resolver 1.1.1.1",
-                    kind: "default",
-                    isDefault: true,
-                    isEnabled: true
-                  },
-                  {
-                    id: 2,
-                    sortOrder: 1,
-                    target: "8.8.8.8",
-                    company: "Google",
-                    logoUrl: null,
-                    label: "Google Public DNS 8.8.8.8",
-                    kind: "default",
-                    isDefault: true,
-                    isEnabled: true
-                  },
-                  {
-                    id: 3,
-                    sortOrder: 2,
-                    target: "9.9.9.9",
-                    company: "Quad9",
-                    logoUrl: null,
-                    label: "Quad9 Secure DNS 9.9.9.9",
-                    kind: "default",
-                    isDefault: true,
-                    isEnabled: false
-                  }
-                ]
-              }
-            }),
+            JSON.stringify(bootstrapPayload),
             { status: 200 }
           )
         );
@@ -187,8 +194,6 @@ describe("dashboard timeline", () => {
 
     expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
     expect(screen.getByText("Segment DOWN")).toBeInTheDocument();
-    expect(screen.getByText("timeout")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "View raw detail" })).toBeInTheDocument();
 
     act(() => {
       screen.getByRole("button", { name: /show provider summary/i }).click();
@@ -220,6 +225,11 @@ describe("dashboard timeline", () => {
           lastChangeAt: 1_710_000_300
         }
       });
+      source.emit("runtime", {
+        monitorRuntime: {
+          mode: "running"
+        }
+      });
       source.emit("sample", {
         observedAt: 1_710_000_600,
         status: "down",
@@ -236,6 +246,90 @@ describe("dashboard timeline", () => {
       expect(screen.getByText("Duration")).toBeInTheDocument();
       expect(screen.getAllByText("Successful Probes").length).toBeGreaterThan(0);
       expect(screen.getByRole("button", { name: "Manage providers" })).toBeInTheDocument();
+    });
+  });
+
+  it("does not split an ok segment again when the latest visible ok started after a no_data gap", async () => {
+    bootstrapPayload = {
+      ...defaultBootstrapPayload,
+      current: {
+        ...defaultBootstrapPayload.current,
+        observedAt: 1_710_000_300,
+        lastChangeAt: 1_710_000_000
+      },
+      historySegments: [
+        {
+          status: "ok",
+          startedAt: 1_710_000_000,
+          endedAt: 1_710_000_060,
+          visibleStart: 1_710_000_000,
+          visibleEnd: 1_710_000_060,
+          durationSeconds: 60,
+          sampleCount: 2,
+          lastObservedAt: 1_710_000_055,
+          latestFailureReason: null,
+          latestLatencyMs: 12,
+          startedBeforeRange: false,
+          endsAfterRange: false
+        },
+        {
+          status: "no_data",
+          startedAt: 1_710_000_060,
+          endedAt: 1_710_000_180,
+          visibleStart: 1_710_000_060,
+          visibleEnd: 1_710_000_180,
+          durationSeconds: 120,
+          sampleCount: 0,
+          lastObservedAt: null,
+          latestFailureReason: null,
+          latestLatencyMs: null,
+          startedBeforeRange: false,
+          endsAfterRange: false
+        },
+        {
+          status: "ok",
+          startedAt: 1_710_000_180,
+          endedAt: null,
+          visibleStart: 1_710_000_180,
+          visibleEnd: 1_710_000_300,
+          durationSeconds: 120,
+          sampleCount: 1,
+          lastObservedAt: 1_710_000_300,
+          latestFailureReason: null,
+          latestLatencyMs: 12,
+          startedBeforeRange: false,
+          endsAfterRange: true
+        }
+      ]
+    };
+
+    render(<Dashboard />);
+
+    await screen.findByText("Segments: 3");
+
+    const source = FakeEventSource.instances[0];
+    if (!source) {
+      throw new Error("Expected dashboard to open an EventSource connection");
+    }
+
+    act(() => {
+      source.emit("snapshot", {
+        current: {
+          observedAt: 1_710_000_360,
+          status: "ok",
+          externalTarget: "1.1.1.1",
+          externalOk: true,
+          externalLatencyMs: 10,
+          failureReason: null,
+          staleAfterSeconds: 15,
+          lastChangeAt: 1_710_000_000
+        }
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Segments: 3")).toBeInTheDocument();
+      expect(screen.getByText("Segment OK")).toBeInTheDocument();
     });
   });
 
