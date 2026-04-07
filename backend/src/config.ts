@@ -14,6 +14,7 @@ export interface AppConfig {
     retentionDays: number;
     dbPath: string;
     staleAfterSeconds: number;
+    noDataAfterSeconds: number;
     pingTimeoutMs: number;
     pingBinary: string;
     heartbeatSeconds: number;
@@ -76,9 +77,14 @@ function parseTargets(rawTargets: string | undefined, fallbackTargets: string[])
 
 export function loadConfig(): AppConfig {
   const intervalSeconds = parsePositiveInteger(process.env.MONITOR_INTERVAL_SECONDS, 5);
+  const defaultNoDataAfterSeconds = intervalSeconds * 6;
   const staleAfterSeconds = parsePositiveInteger(
     process.env.MONITOR_STALE_AFTER_SECONDS,
-    intervalSeconds * 3
+    defaultNoDataAfterSeconds
+  );
+  const noDataAfterSeconds = parsePositiveInteger(
+    process.env.MONITOR_NO_DATA_AFTER_SECONDS,
+    staleAfterSeconds
   );
   const defaultTargets = ["1.1.1.1", "8.8.8.8", "1.0.0.1", "8.8.4.4"];
   const configuredTargets = parseTargets(
@@ -96,6 +102,7 @@ export function loadConfig(): AppConfig {
       retentionDays: parsePositiveInteger(process.env.MONITOR_RETENTION_DAYS, 30),
       dbPath: path.resolve(process.cwd(), process.env.MONITOR_DB_PATH?.trim() || "data/network-sonar.sqlite"),
       staleAfterSeconds,
+      noDataAfterSeconds,
       pingTimeoutMs: parsePositiveInteger(process.env.MONITOR_PING_TIMEOUT_MS, 3000),
       pingBinary: process.env.MONITOR_PING_BINARY?.trim() || "ping",
       heartbeatSeconds: 15,

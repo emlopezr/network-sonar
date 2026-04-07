@@ -32,7 +32,7 @@ describe("GET /api/v1/bootstrap", () => {
       current: {
         status: "ok",
         externalTarget: "1.1.1.1",
-        staleAfterSeconds: 15
+        staleAfterSeconds: 30
       }
     });
     expect(

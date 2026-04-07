@@ -69,7 +69,7 @@ describe("configuration page", () => {
                     target: "1.1.1.1",
                     company: "Cloudflare",
                     logoUrl: null,
-                    label: "Cloudflare Resolver 1.1.1.1",
+                    label: "Cloudflare",
                     kind: "default",
                     isDefault: true,
                     isEnabled: true

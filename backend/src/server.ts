@@ -28,7 +28,8 @@ export function main(): void {
   const historyService = new HistoryService(
     repository,
     transitionRepository,
-    config.monitor.intervalSeconds
+    config.monitor.intervalSeconds,
+    config.monitor.noDataAfterSeconds
   );
   const eventBus = new MonitorEventBus();
   const monitorRuntimeService = new MonitorRuntimeService(

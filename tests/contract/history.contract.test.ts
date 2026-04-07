@@ -93,7 +93,7 @@ describe("GET /api/v1/history", () => {
     });
   });
 
-  it("returns no_data segments for long gaps between samples", async () => {
+  it("does not return no_data segments for short gaps between samples", async () => {
     const base = Math.floor(Date.now() / 1000) - 600;
 
     harness.monitorService.processCycle(createCycle({ observedAt: base }));
@@ -105,11 +105,32 @@ describe("GET /api/v1/history", () => {
     const body = response.body as unknown as TimelineSegmentsResponse;
 
     expect(response.status).toBe(200);
+    expect(body.segments).toHaveLength(1);
+    expect(body.segments[0]).toMatchObject({
+      status: "ok",
+      visibleStart: base,
+      visibleEnd: base + 20,
+      sampleCount: 2
+    });
+  });
+
+  it("returns no_data segments for long gaps between samples", async () => {
+    const base = Math.floor(Date.now() / 1000) - 600;
+
+    harness.monitorService.processCycle(createCycle({ observedAt: base }));
+    harness.monitorService.processCycle(createCycle({ observedAt: base + 35 }));
+
+    const response = await request(harness.app).get(
+      `/api/v1/history/segments?from=${base}&to=${base + 40}`
+    );
+    const body = response.body as unknown as TimelineSegmentsResponse;
+
+    expect(response.status).toBe(200);
     expect(body.segments).toHaveLength(3);
     expect(body.segments[1]).toMatchObject({
       status: "no_data",
       visibleStart: base + 5,
-      visibleEnd: base + 15,
+      visibleEnd: base + 35,
       sampleCount: 0
     });
   });

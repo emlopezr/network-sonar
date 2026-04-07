@@ -6,7 +6,8 @@ export class HistoryService {
   public constructor(
     private readonly repository: ConnectionLogStore,
     private readonly transitionRepository: TransitionStore,
-    private readonly sampleIntervalSeconds: number
+    private readonly sampleIntervalSeconds: number,
+    private readonly noDataAfterSeconds: number
   ) {}
 
   public getHistory(from: number, to: number): PersistedMonitorSample[] {
@@ -21,7 +22,7 @@ export class HistoryService {
     const transitions = this.transitionRepository.listRange(from, to);
     const previousTransition = this.transitionRepository.getLatestBeforeOrAt(Math.max(0, from - 1));
     const segments: TimelineSegment[] = [];
-    const gapThresholdSeconds = this.sampleIntervalSeconds * 2;
+    const gapThresholdSeconds = this.noDataAfterSeconds;
 
     let activeTransition = previousTransition;
 

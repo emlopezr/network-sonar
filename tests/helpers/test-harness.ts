@@ -59,7 +59,8 @@ export function createTestHarness(): TestHarness {
       intervalSeconds: 5,
       retentionDays: 30,
       dbPath: ":memory:",
-      staleAfterSeconds: 15,
+      staleAfterSeconds: 30,
+      noDataAfterSeconds: 30,
       pingTimeoutMs: 3000,
       pingBinary: "ping",
       heartbeatSeconds: 15,
@@ -82,7 +83,8 @@ export function createTestHarness(): TestHarness {
   const historyService = new HistoryService(
     repository,
     transitionRepository,
-    config.monitor.intervalSeconds
+    config.monitor.intervalSeconds,
+    config.monitor.noDataAfterSeconds
   );
   const eventBus = new MonitorEventBus();
   const monitorRuntimeService = new MonitorRuntimeService(

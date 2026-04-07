@@ -88,7 +88,8 @@ describe("history service incidents", () => {
         createTransition("down", 105, 110),
         createTransition("ok", 115)
       ]),
-      5
+      5,
+      30
     );
 
     const incidents = service.getIncidents(100, 115);
@@ -117,7 +118,8 @@ describe("history service incidents", () => {
         createTransition("ok", 105),
         createTransition("down", 110)
       ]),
-      5
+      5,
+      30
     );
 
     const incidents = service.getIncidents(100, 110);
@@ -137,7 +139,8 @@ describe("history service incidents", () => {
     const service = new HistoryService(
       createRepository([createStoredSample(200, "down", "timeout")]),
       createTransitionStore([createTransition("down", 200)]),
-      5
+      5,
+      30
     );
 
     const incidents = service.getIncidents(200, 200);
@@ -157,7 +160,8 @@ describe("history service incidents", () => {
         createTransition("ok", 100),
         createTransition("down", 105, 110)
       ]),
-      5
+      5,
+      30
     );
 
     const incidents = service.getIncidents(100, 110);
@@ -185,7 +189,8 @@ describe("history service timeline segments", () => {
         createTransition("down", 110),
         createTransition("ok", 120)
       ]),
-      5
+      5,
+      30
     );
 
     const segments = service.getTimelineSegments(100, 125);
@@ -230,7 +235,8 @@ describe("history service timeline segments", () => {
         createTransition("ok", 100),
         createTransition("down", 110)
       ]),
-      5
+      5,
+      30
     );
 
     const segments = service.getTimelineSegments(105, 112);
@@ -254,7 +260,7 @@ describe("history service timeline segments", () => {
     });
   });
 
-  it("inserts a no_data segment when samples are separated by a long gap", () => {
+  it("keeps the same state across short gaps under the no_data threshold", () => {
     const service = new HistoryService(
       createRepository([
         createStoredSample(100, "ok"),
@@ -263,10 +269,35 @@ describe("history service timeline segments", () => {
       createTransitionStore([
         createTransition("ok", 100)
       ]),
-      5
+      5,
+      30
     );
 
     const segments = service.getTimelineSegments(100, 120);
+
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toMatchObject({
+      status: "ok",
+      visibleStart: 100,
+      visibleEnd: 120,
+      sampleCount: 2
+    });
+  });
+
+  it("inserts a no_data segment when samples are separated by a long gap", () => {
+    const service = new HistoryService(
+      createRepository([
+        createStoredSample(100, "ok"),
+        createStoredSample(135, "ok")
+      ]),
+      createTransitionStore([
+        createTransition("ok", 100)
+      ]),
+      5,
+      30
+    );
+
+    const segments = service.getTimelineSegments(100, 140);
 
     expect(segments).toHaveLength(3);
     expect(segments[0]).toMatchObject({
@@ -278,14 +309,14 @@ describe("history service timeline segments", () => {
     expect(segments[1]).toMatchObject({
       status: "no_data",
       visibleStart: 105,
-      visibleEnd: 115,
+      visibleEnd: 135,
       sampleCount: 0,
       lastObservedAt: null
     });
     expect(segments[2]).toMatchObject({
       status: "ok",
-      visibleStart: 115,
-      visibleEnd: 120,
+      visibleStart: 135,
+      visibleEnd: 140,
       sampleCount: 1
     });
   });
@@ -298,10 +329,11 @@ describe("history service timeline segments", () => {
       createTransitionStore([
         createTransition("ok", 100)
       ]),
-      5
+      5,
+      30
     );
 
-    const segments = service.getTimelineSegments(100, 120);
+    const segments = service.getTimelineSegments(100, 140);
 
     expect(segments).toHaveLength(2);
     expect(segments[0]).toMatchObject({
@@ -312,7 +344,7 @@ describe("history service timeline segments", () => {
     expect(segments[1]).toMatchObject({
       status: "no_data",
       visibleStart: 105,
-      visibleEnd: 120,
+      visibleEnd: 140,
       endedAt: null
     });
   });

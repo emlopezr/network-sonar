@@ -11,7 +11,7 @@ function createSnapshot(overrides: Partial<CurrentStatusSnapshot> = {}): Current
     externalOk: true,
     externalLatencyMs: 12,
     failureReason: null,
-    staleAfterSeconds: 15,
+    staleAfterSeconds: 30,
     lastChangeAt: 1_710_000_000,
     ...overrides
   };
@@ -20,19 +20,19 @@ function createSnapshot(overrides: Partial<CurrentStatusSnapshot> = {}): Current
 describe("shouldMarkSnapshotStale", () => {
   it("marks the snapshot as stale when both the sample and stream activity are old", () => {
     expect(
-      shouldMarkSnapshotStale(createSnapshot(), 1_710_000_000, 1_710_000_016)
+      shouldMarkSnapshotStale(createSnapshot(), 1_710_000_000, 1_710_000_031)
     ).toBe(true);
   });
 
   it("keeps the snapshot fresh when heartbeats are still arriving", () => {
     expect(
-      shouldMarkSnapshotStale(createSnapshot(), 1_710_000_014, 1_710_000_016)
+      shouldMarkSnapshotStale(createSnapshot(), 1_710_000_029, 1_710_000_031)
     ).toBe(false);
   });
 
   it("ignores heartbeat activity when requested", () => {
     expect(
-      shouldMarkSnapshotStale(createSnapshot(), 1_710_000_014, 1_710_000_016, false)
+      shouldMarkSnapshotStale(createSnapshot(), 1_710_000_029, 1_710_000_031, false)
     ).toBe(true);
   });
 
