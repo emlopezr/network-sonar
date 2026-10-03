@@ -3,18 +3,19 @@ WORKDIR /app
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
-COPY package*.json ./
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY backend/package.json backend/package.json
 COPY frontend/package.json frontend/package.json
 
 FROM base AS build
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 FROM base AS prod-deps
-RUN npm ci --omit=dev --workspace backend --include-workspace-root=false \
-  && npm cache clean --force
+COPY . .
+RUN pnpm --filter backend --prod deploy /prod/backend
 
 FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
@@ -25,9 +26,9 @@ ENV NODE_ENV=production
 ENV HOST=0.0.0.0
 ENV PORT=4044
 ENV MONITOR_DB_PATH=/data/network-sonar.sqlite
-COPY package*.json ./
+COPY package.json ./
 COPY backend/package.json backend/package.json
-COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /prod/backend/node_modules ./backend/node_modules
 COPY --from=build /app/backend/dist ./backend/dist
 COPY --from=build /app/backend/src/data/migrations ./backend/src/data/migrations
 COPY --from=build /app/frontend/dist ./frontend/dist

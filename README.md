@@ -113,16 +113,17 @@ Notes:
 
 ## Local Development
 
-Install dependencies:
+Install dependencies (the pnpm version is pinned in `packageManager`; enable it with Corepack):
 
 ```bash
-npm install
+corepack enable
+pnpm install
 ```
 
 Start backend and frontend in development mode:
 
 ```bash
-npm run dev
+pnpm run dev
 ```
 
 Default dev URLs:
@@ -133,8 +134,8 @@ Default dev URLs:
 Build and run the production bundle locally:
 
 ```bash
-npm run build
-npm run start
+pnpm run build
+pnpm run start
 ```
 
 Default production URL:
@@ -187,25 +188,25 @@ Provider management:
 
 ## Available Commands
 
-- `npm run dev`: start backend and frontend workspaces in parallel
-- `npm run build`: build both workspaces
-- `npm run start`: serve the built frontend from the backend
-- `npm run lint`: run ESLint across backend, frontend, and tests
-- `npm run typecheck`: run strict TypeScript checks for the full workspace
-- `npm test`: run unit, contract, and integration suites
-- `npm run test:unit`: run unit tests only
-- `npm run test:contract`: run API and stream contract tests
-- `npm run test:integration`: run integration tests only
+- `pnpm run dev`: start backend and frontend workspaces in parallel
+- `pnpm run build`: build both workspaces
+- `pnpm run start`: serve the built frontend from the backend
+- `pnpm run lint`: run ESLint across backend, frontend, and tests
+- `pnpm run typecheck`: run strict TypeScript checks for the full workspace
+- `pnpm test`: run unit, contract, and integration suites
+- `pnpm run test:unit`: run unit tests only
+- `pnpm run test:contract`: run API and stream contract tests
+- `pnpm run test:integration`: run integration tests only
 
 ## Validation
 
 Recommended validation before publishing changes:
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
-npm run build
+pnpm run lint
+pnpm run typecheck
+pnpm test
+pnpm run build
 ```
 
 ## Troubleshooting
@@ -248,8 +249,8 @@ docker logs -f network-sonar
 Contributions are welcome. For local validation, run:
 
 ```bash
-npm run lint
-npm run typecheck
-npm test
+pnpm run lint
+pnpm run typecheck
+pnpm test
 ```
 
